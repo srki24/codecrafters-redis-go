@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 )
-
-var _ = net.Listen
-var _ = os.Exit
 
 func main() {
 
@@ -23,6 +21,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	conn.Write([]byte("+PONG\r\n"))
+	for {
+
+		var buff []byte = make([]byte, 1024)
+		n, _ := conn.Read(buff)
+
+		for _, ln := range strings.Split(string(buff[:n]), "\r\n") {
+			if ln == "PING" {
+				conn.Write([]byte("+PONG\r\n"))
+			}
+
+		}
+	}
 
 }
