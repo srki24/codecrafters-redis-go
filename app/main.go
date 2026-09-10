@@ -5,6 +5,9 @@ import (
 	"net"
 	"os"
 	"strings"
+
+	cmd "github.com/codecrafters-io/redis-starter-go/app/commands"
+	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
 func hanleConn(conn net.Conn) {
@@ -19,12 +22,19 @@ func hanleConn(conn net.Conn) {
 			return
 		}
 
-		for _, ln := range strings.Split(string(buff[:n]), "\r\n") {
-			if ln == "PING" {
-				conn.Write([]byte("+PONG\r\n"))
-			}
+		request, _ := resp.Parse(buff[:n])
+		command, err := cmd.ParseCommand(request)
 
+		var response resp.RESPValue
+		switch strings.ToUpper(command.Name) {
+		case "ECHO":
+			response = resp.BulkString{Data: []byte(command.Args[0])}
+		case "PING":
+			response = resp.SimpleString{Data: []byte("PONG")}
 		}
+
+		conn.Write(response.Serialize())
+
 	}
 }
 func main() {
