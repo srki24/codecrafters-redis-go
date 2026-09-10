@@ -13,6 +13,8 @@ import (
 func hanleConn(conn net.Conn) {
 	defer conn.Close()
 
+	mapping := make(map[string]string)
+
 	for {
 
 		var buff []byte = make([]byte, 1024)
@@ -31,12 +33,25 @@ func hanleConn(conn net.Conn) {
 			response = resp.BulkString{Data: []byte(command.Args[0])}
 		case "PING":
 			response = resp.SimpleString{Data: []byte("PONG")}
+		case "SET":
+			k := command.Args[0]
+			v := command.Args[1]
+			mapping[k] = v
+
+			response = resp.SimpleString{Data: []byte("OK")}
+		case "GET":
+			k := command.Args[0]
+			if v, ok := mapping[k]; ok {
+				response = resp.BulkString{Data: []byte(v)}
+			} else {
+				response = resp.BulkString{}
+			}
 		}
-
 		conn.Write(response.Serialize())
-
 	}
+
 }
+
 func main() {
 
 	l, err := net.Listen("tcp", "0.0.0.0:6379")
