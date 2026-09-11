@@ -2,6 +2,7 @@ package resp
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -65,4 +66,17 @@ func (v Array) GetStringData() string {
 		data = append(data, rv.GetStringData())
 	}
 	return strings.Join(data, ",")
+}
+
+type Integer struct {
+	Data int
+}
+
+func (v Integer) Serialize() []byte {
+	return fmt.Appendf(nil, ":%d\r\n", v.Data)
+
+}
+
+func (v Integer) GetStringData() string {
+	return strconv.Itoa(v.Data)
 }
