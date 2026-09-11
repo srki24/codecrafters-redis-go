@@ -4,6 +4,7 @@ import (
 	"errors"
 	"slices"
 	"strconv"
+	"time"
 )
 
 type ListMapping = map[string][]string
@@ -114,5 +115,37 @@ func ListPop(cmd Command, lst ListMapping) ([]string, error) {
 		return data[:toPop], nil
 	}
 	return nil, errors.New("List doesn,t exist")
+
+}
+
+func ListBLPop(cmd Command, lst ListMapping) ([]string, error) {
+	args := cmd.Args
+	if len(args) < 2 {
+		return nil, errors.New("Couldnt block pop, not enough args")
+	}
+
+	key := args[0]
+	timeout, err := strconv.Atoi(args[1])
+	if err != nil {
+		return nil, err
+	}
+
+	popCmd := Command{Name: "POP", Args: []string{key}}
+
+	start := time.Now()
+
+	for {
+		value, err := ListPop(popCmd, lst)
+		if err == nil {
+			return []string{key, value[0]}, nil
+		}
+
+		end := time.Now()
+
+		if (timeout != 0) && start.Sub(end).Seconds() > float64(timeout) {
+			return nil, errors.New("No data, timed out")
+		}
+
+	}
 
 }

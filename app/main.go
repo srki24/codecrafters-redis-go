@@ -81,6 +81,12 @@ func handleConn(conn net.Conn, mapping map[string]cmd.Mapping, listMapping cmd.L
 			} else {
 				response = resp.NewArray(data)
 			}
+		case "BLPOP":
+			data, err := cmd.ListBLPop(command, listMapping)
+			if err != nil {
+				fmt.Println(err)
+			}
+			response = resp.NewArray(data)
 		}
 		conn.Write(response.Serialize())
 	}
