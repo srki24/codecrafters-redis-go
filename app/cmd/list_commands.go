@@ -91,18 +91,28 @@ func LRange(cmd Command, lst ListMapping) ([]string, error) {
 
 }
 
-func ListPop(cmd Command, lst ListMapping) (ListMapping, string, error) {
+func ListPop(cmd Command, lst ListMapping) (ListMapping, []string, error) {
 	args := cmd.Args
 	if len(args) < 1 {
-		return nil, "", errors.New("Failed to get pop element, not enough args")
+		return nil, nil, errors.New("Failed to get pop element, not enough args")
 	}
 
 	key := args[0]
+	toPop := 1
+
+	if len(args) == 2 {
+		newPop, err := strconv.Atoi(args[1])
+		if err != nil {
+			return nil, nil, errors.New("Failed to parse pop argument")
+		}
+		toPop = newPop
+	}
 
 	if data, ok := lst[key]; ok {
-		lst[key] = data[1:]
-		return lst, data[0], nil
+		toPop = max(toPop, len(data))
+		lst[key] = data[toPop:]
+		return lst, data[:toPop], nil
 	}
-	return lst, "", errors.New("List doesn,t exist")
+	return lst, nil, errors.New("List doesn,t exist")
 
 }

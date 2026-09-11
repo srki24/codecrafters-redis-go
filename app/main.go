@@ -74,12 +74,16 @@ func hanleConn(conn net.Conn) {
 		case "LLEN":
 			response = resp.Integer{Data: cmd.GetNrElems(command, listMapping)}
 		case "LPOP":
-			var data string
+			var data []string
 			listMapping, data, err = cmd.ListPop(command, listMapping)
 			if err != nil {
 				fmt.Println(err)
 			}
-			response = resp.BulkString{Data: []byte(data)}
+			if len(data) == 1 {
+				response = resp.BulkString{Data: []byte(data[0])}
+			} else {
+				response = resp.NewArray(data)
+			}
 		}
 		conn.Write(response.Serialize())
 	}
