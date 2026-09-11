@@ -52,13 +52,18 @@ func hanleConn(conn net.Conn) {
 			}
 
 		case "RPUSH":
-			{
-				listMapping, err := cmd.AddElement(command, listMapping)
-				if err != nil {
-					fmt.Println(err)
-				}
-				response = resp.Integer{Data: cmd.GetNrElems(command, listMapping)}
+			listMapping, err := cmd.AddElement(command, listMapping)
+			if err != nil {
+				fmt.Println(err)
 			}
+			response = resp.Integer{Data: cmd.GetNrElems(command, listMapping)}
+
+		case "LRANGE":
+			data, err := cmd.LRange(command, listMapping)
+			if err != nil {
+				fmt.Println(err)
+			}
+			response = resp.NewArray(data)
 		}
 		conn.Write(response.Serialize())
 	}

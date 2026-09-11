@@ -1,6 +1,9 @@
 package cmd
 
-import "errors"
+import (
+	"errors"
+	"strconv"
+)
 
 type ListMapping = map[string][]string
 
@@ -19,12 +22,11 @@ func AddElement(cmd Command, lst ListMapping) (ListMapping, error) {
 	key := args[0]
 	values := args[1:]
 
-	if v, ok := lst[key]; ok {
-		v := append(v, values...)
+	if data, ok := lst[key]; ok {
+		v := append(data, values...)
 		lst[key] = v
 	} else {
-		v := values
-		lst[key] = v
+		lst[key] = values
 	}
 
 	return lst, nil
@@ -37,4 +39,31 @@ func GetNrElems(cmd Command, lst ListMapping) int {
 		return len(v)
 	}
 	return 0
+}
+
+func LRange(cmd Command, lst ListMapping) ([]string, error) {
+
+	args := cmd.Args
+	if len(args) < 3 {
+		return nil, errors.New("Failed to get range, not enough args")
+	}
+
+	key := args[0]
+
+	fromIdx, err := strconv.Atoi(args[1])
+	if err != nil {
+		return nil, err
+	}
+
+	toIdx, err := strconv.Atoi(args[2])
+	if err != nil {
+		return nil, err
+	}
+	toIdx = toIdx + 1
+
+	if data, ok := lst[key]; ok {
+		return data[fromIdx:min(toIdx, len(data))], nil
+	}
+	return nil, errors.New("Non existing list")
+
 }

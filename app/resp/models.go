@@ -68,6 +68,15 @@ func (v Array) GetStringData() string {
 	return strings.Join(data, ",")
 }
 
+func NewArray(data []string) Array {
+	arr := Array{}
+
+	for _, dp := range data {
+		arr.Data = append(arr.Data, BulkString{[]byte(dp)})
+	}
+	return arr
+}
+
 type Integer struct {
 	Data int
 }
