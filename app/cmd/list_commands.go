@@ -59,10 +59,21 @@ func LRange(cmd Command, lst ListMapping) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	toIdx = toIdx + 1
 
 	if data, ok := lst[key]; ok {
-		return data[fromIdx:min(toIdx, len(data))], nil
+		nrElements := len(data)
+
+		if fromIdx < 0 {
+			fromIdx = max(0, nrElements+fromIdx)
+		}
+
+		if toIdx < 0 {
+			toIdx = max(0, nrElements+toIdx+1)
+		} else {
+			toIdx = min(toIdx+1, nrElements)
+		}
+
+		return data[fromIdx:toIdx], nil
 	}
 	return nil, errors.New("Non existing list")
 
