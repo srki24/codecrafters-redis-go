@@ -52,7 +52,14 @@ func hanleConn(conn net.Conn) {
 			}
 
 		case "RPUSH":
-			listMapping, err := cmd.AddElement(command, listMapping)
+			listMapping, err := cmd.ListPush(command, listMapping, true)
+			if err != nil {
+				fmt.Println(err)
+			}
+			response = resp.Integer{Data: cmd.GetNrElems(command, listMapping)}
+
+		case "LPUSH":
+			listMapping, err := cmd.ListPush(command, listMapping, false)
 			if err != nil {
 				fmt.Println(err)
 			}

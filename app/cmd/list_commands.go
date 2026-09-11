@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"errors"
+	"slices"
 	"strconv"
 )
 
@@ -13,7 +14,7 @@ func NewListMapping() ListMapping {
 
 }
 
-func AddElement(cmd Command, lst ListMapping) (ListMapping, error) {
+func ListPush(cmd Command, lst ListMapping, right bool) (ListMapping, error) {
 	args := cmd.Args
 	if len(args) < 2 {
 		return lst, errors.New("Failed to push to the list, not enough args")
@@ -21,9 +22,17 @@ func AddElement(cmd Command, lst ListMapping) (ListMapping, error) {
 
 	key := args[0]
 	values := args[1:]
+	if !right {
+		slices.Reverse(values)
+	}
 
 	if data, ok := lst[key]; ok {
-		v := append(data, values...)
+		var v []string
+		if right {
+			v = append(data, values...)
+		} else {
+			v = append(values, data...)
+		}
 		lst[key] = v
 	} else {
 		lst[key] = values
