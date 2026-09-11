@@ -71,6 +71,8 @@ func hanleConn(conn net.Conn) {
 				fmt.Println(err)
 			}
 			response = resp.NewArray(data)
+		case "LLEN":
+			response = resp.Integer{Data: cmd.GetNrElems(command, listMapping)}
 		}
 		conn.Write(response.Serialize())
 	}

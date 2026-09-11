@@ -43,6 +43,9 @@ func ListPush(cmd Command, lst ListMapping, right bool) (ListMapping, error) {
 
 func GetNrElems(cmd Command, lst ListMapping) int {
 	args := cmd.Args
+	if len(args) < 1 {
+		return 0
+	}
 
 	if v, ok := lst[args[0]]; ok {
 		return len(v)
