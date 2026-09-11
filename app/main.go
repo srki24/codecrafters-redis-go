@@ -14,8 +14,8 @@ import (
 func hanleConn(conn net.Conn) {
 	defer conn.Close()
 
-	mapping := make(map[string]cmd.Mapping)
-	list := cmd.NewList()
+	mapping := cmd.NewMapping()
+	listMapping := cmd.NewListMapping()
 
 	for {
 
@@ -53,11 +53,11 @@ func hanleConn(conn net.Conn) {
 
 		case "RPUSH":
 			{
-				list, err := cmd.AddElement(command, list)
+				listMapping, err := cmd.AddElement(command, listMapping)
 				if err != nil {
 					fmt.Println(err)
 				}
-				response = resp.Integer{Data: len(list)}
+				response = resp.Integer{Data: cmd.GetNrElems(command, listMapping)}
 			}
 		}
 		conn.Write(response.Serialize())
