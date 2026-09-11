@@ -11,11 +11,8 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
-func hanleConn(conn net.Conn) {
+func handleConn(conn net.Conn, mapping map[string]cmd.Mapping, listMapping cmd.ListMapping) {
 	defer conn.Close()
-
-	mapping := cmd.NewMapping()
-	listMapping := cmd.NewListMapping()
 
 	for {
 
@@ -36,7 +33,7 @@ func hanleConn(conn net.Conn) {
 		case "PING":
 			response = resp.SimpleString{Data: []byte("PONG")}
 		case "SET":
-			mapping, err = cmd.SetMapping(command, mapping)
+			err = cmd.SetMapping(command, mapping)
 			if err != nil {
 				fmt.Println(err)
 				break
@@ -52,14 +49,14 @@ func hanleConn(conn net.Conn) {
 			}
 
 		case "RPUSH":
-			listMapping, err = cmd.ListPush(command, listMapping, true)
+			err = cmd.ListPush(command, listMapping, true)
 			if err != nil {
 				fmt.Println(err)
 			}
 			response = resp.Integer{Data: cmd.GetNrElems(command, listMapping)}
 
 		case "LPUSH":
-			listMapping, err = cmd.ListPush(command, listMapping, false)
+			err = cmd.ListPush(command, listMapping, false)
 			if err != nil {
 				fmt.Println(err)
 			}
@@ -75,7 +72,7 @@ func hanleConn(conn net.Conn) {
 			response = resp.Integer{Data: cmd.GetNrElems(command, listMapping)}
 		case "LPOP":
 			var data []string
-			listMapping, data, err = cmd.ListPop(command, listMapping)
+			data, err = cmd.ListPop(command, listMapping)
 			if err != nil {
 				fmt.Println(err)
 			}
@@ -98,6 +95,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	mapping := cmd.NewMapping()
+	listMapping := cmd.NewListMapping()
+
 	for {
 
 		conn, err := l.Accept()
@@ -105,7 +105,7 @@ func main() {
 			fmt.Println("Error accepting connection: ", err.Error())
 			os.Exit(1)
 		}
-		go hanleConn(conn)
+		go handleConn(conn, mapping, listMapping)
 	}
 
 }

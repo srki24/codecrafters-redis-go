@@ -14,10 +14,10 @@ func NewListMapping() ListMapping {
 
 }
 
-func ListPush(cmd Command, lst ListMapping, right bool) (ListMapping, error) {
+func ListPush(cmd Command, lst ListMapping, right bool) error {
 	args := cmd.Args
 	if len(args) < 2 {
-		return lst, errors.New("Failed to push to the list, not enough args")
+		return errors.New("Failed to push to the list, not enough args")
 	}
 
 	key := args[0]
@@ -38,7 +38,7 @@ func ListPush(cmd Command, lst ListMapping, right bool) (ListMapping, error) {
 		lst[key] = values
 	}
 
-	return lst, nil
+	return nil
 }
 
 func GetNrElems(cmd Command, lst ListMapping) int {
@@ -91,10 +91,10 @@ func LRange(cmd Command, lst ListMapping) ([]string, error) {
 
 }
 
-func ListPop(cmd Command, lst ListMapping) (ListMapping, []string, error) {
+func ListPop(cmd Command, lst ListMapping) ([]string, error) {
 	args := cmd.Args
 	if len(args) < 1 {
-		return nil, nil, errors.New("Failed to get pop element, not enough args")
+		return nil, errors.New("Failed to get pop element, not enough args")
 	}
 
 	key := args[0]
@@ -103,7 +103,7 @@ func ListPop(cmd Command, lst ListMapping) (ListMapping, []string, error) {
 	if len(args) == 2 {
 		newPop, err := strconv.Atoi(args[1])
 		if err != nil {
-			return nil, nil, errors.New("Failed to parse pop argument")
+			return nil, errors.New("Failed to parse pop argument")
 		}
 		toPop = newPop
 	}
@@ -111,8 +111,8 @@ func ListPop(cmd Command, lst ListMapping) (ListMapping, []string, error) {
 	if data, ok := lst[key]; ok {
 		toPop = min(toPop, len(data))
 		lst[key] = data[toPop:]
-		return lst, data[:toPop], nil
+		return data[:toPop], nil
 	}
-	return lst, nil, errors.New("List doesn,t exist")
+	return nil, errors.New("List doesn,t exist")
 
 }

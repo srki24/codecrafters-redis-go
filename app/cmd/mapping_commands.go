@@ -19,13 +19,13 @@ func NewMapping() map[string]Mapping {
 	return mapping
 
 }
-func SetMapping(command Command, mapping map[string]Mapping) (map[string]Mapping, error) {
+func SetMapping(command Command, mapping map[string]Mapping) error {
 
 	args := command.Args
 	exp := -1
 
 	if len(args) < 2 {
-		return mapping, errors.New("Failed to set mapping, not enough args")
+		return errors.New("Failed to set mapping, not enough args")
 	}
 	key := args[0]
 	value := args[1]
@@ -37,7 +37,7 @@ func SetMapping(command Command, mapping map[string]Mapping) (map[string]Mapping
 		case "EX", "PX":
 			optionVal, err := strconv.Atoi(optionVal)
 			if err != nil {
-				return mapping, fmt.Errorf("Couldn't convert value to an integer: %s", optionVal)
+				return fmt.Errorf("Couldn't convert value to an integer: %s", optionVal)
 			}
 			factor := 1
 			if option == "EX" {
@@ -45,12 +45,12 @@ func SetMapping(command Command, mapping map[string]Mapping) (map[string]Mapping
 			}
 			exp = optionVal * factor
 		default:
-			return mapping, errors.New("Unknown option")
+			return errors.New("Unknown option")
 		}
 	}
 	mapping[key] = Mapping{value: value, time: time.Now(), exp: exp}
 
-	return mapping, nil
+	return nil
 
 }
 
