@@ -17,13 +17,13 @@ func AddElement(cmd Command, lst ListMapping) (ListMapping, error) {
 	}
 
 	key := args[0]
-	value := args[1]
+	values := args[1:]
 
 	if v, ok := lst[key]; ok {
-		v := append(v, value)
+		v := append(v, values...)
 		lst[key] = v
 	} else {
-		v := []string{value}
+		v := values
 		lst[key] = v
 	}
 
