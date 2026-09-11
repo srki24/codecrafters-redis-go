@@ -109,7 +109,7 @@ func ListPop(cmd Command, lst ListMapping) (ListMapping, []string, error) {
 	}
 
 	if data, ok := lst[key]; ok {
-		toPop = max(toPop, len(data))
+		toPop = min(toPop, len(data))
 		lst[key] = data[toPop:]
 		return lst, data[:toPop], nil
 	}
