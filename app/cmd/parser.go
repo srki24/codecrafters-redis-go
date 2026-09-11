@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
@@ -55,4 +56,74 @@ func ParseCommand(input resp.RESPValue) (Command, error) {
 	default:
 		return Command{}, errors.New("failed to parse, unknown input value")
 	}
+}
+
+func GenerateResponse(command Command, mapping map[string]Mapping, listMapping ListMapping) resp.RESPValue {
+
+	var response resp.RESPValue
+	switch strings.ToUpper(command.Name) {
+	case "ECHO":
+		response = resp.BulkString{Data: []byte(command.Args[0])}
+	case "PING":
+		response = resp.SimpleString{Data: []byte("PONG")}
+	case "SET":
+		err := SetMapping(command, mapping)
+		if err != nil {
+			fmt.Println(err)
+			break
+		}
+		response = resp.SimpleString{Data: []byte("OK")}
+
+	case "GET":
+		if v, err := GetMapping(command, mapping); err == nil {
+			response = resp.BulkString{Data: []byte(v)}
+		} else {
+			fmt.Println(err)
+			response = resp.BulkString{}
+		}
+
+	case "RPUSH":
+		err := ListPush(command, listMapping, true)
+		if err != nil {
+			fmt.Println(err)
+		}
+		response = resp.Integer{Data: GetNrElems(command, listMapping)}
+
+	case "LPUSH":
+		err := ListPush(command, listMapping, false)
+		if err != nil {
+			fmt.Println(err)
+		}
+		response = resp.Integer{Data: GetNrElems(command, listMapping)}
+
+	case "LRANGE":
+		data, err := LRange(command, listMapping)
+		if err != nil {
+			fmt.Println(err)
+		}
+		response = resp.NewArray(data)
+	case "LLEN":
+		response = resp.Integer{Data: GetNrElems(command, listMapping)}
+	case "LPOP":
+		var data []string
+		data, err := ListPop(command, listMapping)
+		if err != nil {
+			fmt.Println(err)
+		}
+		if len(data) == 1 {
+			response = resp.BulkString{Data: []byte(data[0])}
+		} else {
+			response = resp.NewArray(data)
+		}
+	case "BLPOP":
+		data, err := ListBLPop(command, listMapping)
+		if err != nil {
+			fmt.Println(err)
+			response = resp.NewNullArray()
+		} else {
+			response = resp.NewArray(data)
+
+		}
+	}
+	return response
 }

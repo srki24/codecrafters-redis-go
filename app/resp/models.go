@@ -47,10 +47,15 @@ func (v BulkString) GetStringData() string {
 }
 
 type Array struct {
-	Data []RESPValue
+	Data   []RESPValue
+	IsNull bool
 }
 
 func (v Array) Serialize() []byte {
+
+	if v.IsNull {
+		return []byte("*-1\r\n")
+	}
 
 	out := fmt.Appendf(nil, "*%d\r\n", len(v.Data))
 
@@ -75,6 +80,9 @@ func NewArray(data []string) Array {
 		arr.Data = append(arr.Data, BulkString{[]byte(dp)})
 	}
 	return arr
+}
+func NewNullArray() Array {
+	return Array{IsNull: true}
 }
 
 type Integer struct {

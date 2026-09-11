@@ -110,6 +110,9 @@ func ListPop(cmd Command, lst ListMapping) ([]string, error) {
 	}
 
 	if data, ok := lst[key]; ok {
+		if len(data) == 0 {
+			return nil, errors.New("No data to pop")
+		}
 		toPop = min(toPop, len(data))
 		lst[key] = data[toPop:]
 		return data[:toPop], nil
@@ -125,7 +128,8 @@ func ListBLPop(cmd Command, lst ListMapping) ([]string, error) {
 	}
 
 	key := args[0]
-	timeout, err := strconv.Atoi(args[1])
+	timeout, err := strconv.ParseFloat(args[1], 64)
+
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +146,7 @@ func ListBLPop(cmd Command, lst ListMapping) ([]string, error) {
 
 		end := time.Now()
 
-		if (timeout != 0) && start.Sub(end).Seconds() > float64(timeout) {
+		if (timeout != 0) && end.Sub(start).Seconds() > timeout {
 			return nil, errors.New("No data, timed out")
 		}
 
