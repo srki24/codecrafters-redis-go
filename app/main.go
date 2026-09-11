@@ -52,14 +52,14 @@ func hanleConn(conn net.Conn) {
 			}
 
 		case "RPUSH":
-			listMapping, err := cmd.ListPush(command, listMapping, true)
+			listMapping, err = cmd.ListPush(command, listMapping, true)
 			if err != nil {
 				fmt.Println(err)
 			}
 			response = resp.Integer{Data: cmd.GetNrElems(command, listMapping)}
 
 		case "LPUSH":
-			listMapping, err := cmd.ListPush(command, listMapping, false)
+			listMapping, err = cmd.ListPush(command, listMapping, false)
 			if err != nil {
 				fmt.Println(err)
 			}
@@ -73,6 +73,13 @@ func hanleConn(conn net.Conn) {
 			response = resp.NewArray(data)
 		case "LLEN":
 			response = resp.Integer{Data: cmd.GetNrElems(command, listMapping)}
+		case "LPOP":
+			var data string
+			listMapping, data, err = cmd.ListPop(command, listMapping)
+			if err != nil {
+				fmt.Println(err)
+			}
+			response = resp.BulkString{Data: []byte(data)}
 		}
 		conn.Write(response.Serialize())
 	}

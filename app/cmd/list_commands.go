@@ -90,3 +90,19 @@ func LRange(cmd Command, lst ListMapping) ([]string, error) {
 	return nil, errors.New("Non existing list")
 
 }
+
+func ListPop(cmd Command, lst ListMapping) (ListMapping, string, error) {
+	args := cmd.Args
+	if len(args) < 1 {
+		return nil, "", errors.New("Failed to get pop element, not enough args")
+	}
+
+	key := args[0]
+
+	if data, ok := lst[key]; ok {
+		lst[key] = data[1:]
+		return lst, data[0], nil
+	}
+	return lst, "", errors.New("List doesn,t exist")
+
+}
