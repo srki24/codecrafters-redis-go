@@ -59,7 +59,6 @@ func ParseCommand(input resp.RESPValue) (Command, error) {
 }
 
 func GenerateResponse(command Command, mapping map[string]Mapping, listMapping ListMapping) resp.RESPValue {
-
 	var response resp.RESPValue
 	switch strings.ToUpper(command.Name) {
 	case "ECHO":
@@ -124,6 +123,8 @@ func GenerateResponse(command Command, mapping map[string]Mapping, listMapping L
 			response = resp.NewArray(data)
 
 		}
+	default:
+		panic(fmt.Sprintf("Unknown command: %s", command.Name))
 	}
 	return response
 }

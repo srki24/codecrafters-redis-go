@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"net"
 	"os"
@@ -12,18 +13,24 @@ import (
 func handleConn(conn net.Conn, mapping map[string]cmd.Mapping, listMapping cmd.ListMapping) {
 	defer conn.Close()
 
+read:
 	for {
 
-		var buff []byte = make([]byte, 1024)
-		n, err := conn.Read(buff)
+		reader := bufio.NewReader(conn)
+		var buff []byte = make([]byte, 2048)
+
+		n, err := reader.Read(buff)
 
 		if err != nil {
-			return
+			fmt.Println(err)
+			continue read
 		}
-
 		request, _ := resp.Parse(buff[:n])
 		command, err := cmd.ParseCommand(request)
 
+		if err != nil {
+			fmt.Println(err)
+		}
 		response := cmd.GenerateResponse(command, mapping, listMapping)
 
 		conn.Write(response.Serialize())
