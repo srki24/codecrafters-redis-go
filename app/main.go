@@ -32,7 +32,7 @@ read:
 		if err != nil {
 			fmt.Println(err)
 		}
-		response := cmd.GenerateResponse(command, db)
+		response := cmd.GenerateResponse(command, &db)
 
 		conn.Write(response.Serialize())
 	}

@@ -11,7 +11,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/db"
 )
 
-func ListPush(cmd Command, database db.Database, right bool) error {
+func ListPush(cmd Command, database *db.Database, right bool) error {
 	args := cmd.Args
 	if len(args) < 2 {
 		return errors.New("Failed to push to the list, not enough args")
@@ -23,7 +23,7 @@ func ListPush(cmd Command, database db.Database, right bool) error {
 		slices.Reverse(values)
 	}
 
-	if data, ok := database[key]; ok {
+	if data, ok := database.Get(key); ok {
 		if val, ok := data.Value.(db.ListType); ok {
 
 			if right {
@@ -36,18 +36,18 @@ func ListPush(cmd Command, database db.Database, right bool) error {
 
 		}
 	}
-	database[key] = db.Data{Value: db.ListType(values), Time: time.Now(), Exp: -1}
+	database.Set(key, db.Data{Value: db.ListType(values), Time: time.Now(), Exp: -1})
 
 	return nil
 }
 
-func GetNrElems(cmd Command, database db.Database) int {
+func GetNrElems(cmd Command, database *db.Database) int {
 	args := cmd.Args
 	if len(args) < 1 {
 		return 0
 	}
 	key := args[0]
-	if data, ok := database[key]; ok {
+	if data, ok := database.Get(key); ok {
 		if val, ok := data.Value.(db.ListType); ok {
 			return len(val)
 
@@ -56,7 +56,7 @@ func GetNrElems(cmd Command, database db.Database) int {
 	return 0
 }
 
-func LRange(cmd Command, database db.Database) ([]string, error) {
+func LRange(cmd Command, database *db.Database) ([]string, error) {
 
 	args := cmd.Args
 	if len(args) < 3 {
@@ -75,7 +75,7 @@ func LRange(cmd Command, database db.Database) ([]string, error) {
 		return nil, err
 	}
 
-	if data, ok := database[key]; ok {
+	if data, ok := database.Get(key); ok {
 		if val, ok := data.Value.(db.ListType); ok {
 
 			nrElements := len(val)
@@ -99,7 +99,7 @@ func LRange(cmd Command, database db.Database) ([]string, error) {
 
 }
 
-func ListPop(cmd Command, database db.Database) ([]string, error) {
+func ListPop(cmd Command, database *db.Database) ([]string, error) {
 	args := cmd.Args
 	if len(args) < 1 {
 		return nil, errors.New("Failed to get pop element, not enough args")
@@ -116,15 +116,14 @@ func ListPop(cmd Command, database db.Database) ([]string, error) {
 		toPop = newPop
 	}
 
-	if data, ok := database[key]; ok {
+	if data, ok := database.Get(key); ok {
 		if val, ok := data.Value.(db.ListType); ok {
 			if len(val) == 0 {
 				return nil, errors.New("No data to pop")
 			}
 			toPop = min(toPop, len(val))
-			currVal := database[key]
-			currVal.Value = val[toPop:]
-			database[key] = currVal
+			data.Value = val[toPop:]
+			database.Set(key, data)
 
 			return val[:toPop], nil
 		}
@@ -134,7 +133,7 @@ func ListPop(cmd Command, database db.Database) ([]string, error) {
 
 }
 
-func ListBLPop(cmd Command, database db.Database) ([]string, error) {
+func ListBLPop(cmd Command, database *db.Database) ([]string, error) {
 	args := cmd.Args
 	if len(args) < 2 {
 		return nil, errors.New("Couldnt block pop, not enough args")

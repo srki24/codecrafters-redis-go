@@ -6,7 +6,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/db"
 )
 
-func Type(command Command, database db.Database) (string, error) {
+func Type(command Command, database *db.Database) (string, error) {
 	args := command.Args
 	if len(args) < 1 {
 		return "", errors.New("Failed to get type, not enough args")
@@ -14,7 +14,7 @@ func Type(command Command, database db.Database) (string, error) {
 
 	key := args[0]
 
-	if data, ok := database[key]; ok {
+	if data, ok := database.Get(key); ok {
 		return data.Value.GetType(), nil
 	}
 	return "none", nil

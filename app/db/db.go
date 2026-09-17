@@ -1,6 +1,7 @@
 package db
 
 import (
+	"sync"
 	"time"
 )
 
@@ -10,7 +11,25 @@ type Data struct {
 	Exp   int
 }
 
-type Database map[string]Data
+type Database struct {
+	data map[string]Data
+	mu   sync.Mutex
+}
+
+func (db *Database) Get(key string) (Data, bool) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	data, ok := db.data[key]
+	return data, ok
+}
+
+func (db *Database) Set(key string, value Data) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	db.data[key] = value
+
+}
 
 type dbValue interface {
 	GetType() string
@@ -29,6 +48,6 @@ func (lt ListType) GetType() string {
 }
 
 func InitializeDb() Database {
-	db := make(Database, 0)
-	return db
+	data := make(map[string]Data, 0)
+	return Database{data: data}
 }

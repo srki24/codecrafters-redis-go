@@ -11,18 +11,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/db"
 )
 
-type Mapping struct {
-	value string
-	time  time.Time
-	exp   int
-}
-
-func NewMapping() map[string]Mapping {
-	mapping := make(map[string]Mapping)
-	return mapping
-
-}
-func Set(command Command, database db.Database) error {
+func Set(command Command, database *db.Database) error {
 
 	args := command.Args
 	exp := -1
@@ -51,13 +40,13 @@ func Set(command Command, database db.Database) error {
 			return errors.New("Unknown option")
 		}
 	}
-	database[key] = db.Data{Value: value, Time: time.Now(), Exp: exp}
+	database.Set(key, db.Data{Value: value, Time: time.Now(), Exp: exp})
 
 	return nil
 
 }
 
-func Get(command Command, database db.Database) (db.StringType, error) {
+func Get(command Command, database *db.Database) (db.StringType, error) {
 	args := command.Args
 	fmt.Println(args)
 
@@ -67,7 +56,7 @@ func Get(command Command, database db.Database) (db.StringType, error) {
 
 	key := args[0]
 
-	if v, ok := database[key]; ok {
+	if v, ok := database.Get(key); ok {
 
 		cTime := time.Now()
 

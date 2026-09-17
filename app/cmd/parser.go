@@ -59,7 +59,7 @@ func ParseCommand(input resp.RESPValue) (Command, error) {
 	}
 }
 
-func GenerateResponse(command Command, database db.Database) resp.RESPValue {
+func GenerateResponse(command Command, database *db.Database) resp.RESPValue {
 	var response resp.RESPValue
 	switch strings.ToUpper(command.Name) {
 	case "ECHO":
