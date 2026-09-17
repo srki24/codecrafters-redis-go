@@ -11,7 +11,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
-func handleConn(conn net.Conn, db db.Database) {
+func handleConn(conn net.Conn, db *db.Database) {
 	defer conn.Close()
 
 read:
@@ -32,7 +32,7 @@ read:
 		if err != nil {
 			fmt.Println(err)
 		}
-		response := cmd.GenerateResponse(command, &db)
+		response := cmd.GenerateResponse(command, db)
 
 		conn.Write(response.Serialize())
 	}
@@ -55,7 +55,7 @@ func main() {
 			fmt.Println("Error accepting connection: ", err.Error())
 			os.Exit(1)
 		}
-		go handleConn(conn, db)
+		go handleConn(conn, &db)
 	}
 
 }

@@ -5,12 +5,14 @@ import (
 	"time"
 )
 
+// Data field
 type Data struct {
 	Value dbValue
 	Time  time.Time
 	Exp   int
 }
 
+// Database
 type Database struct {
 	data map[string]Data
 	mu   sync.Mutex
@@ -23,6 +25,10 @@ func (db *Database) Get(key string) (Data, bool) {
 	data, ok := db.data[key]
 	return data, ok
 }
+func InitializeDb() Database {
+	data := make(map[string]Data, 0)
+	return Database{data: data}
+}
 
 func (db *Database) Set(key string, value Data) {
 	db.mu.Lock()
@@ -31,23 +37,33 @@ func (db *Database) Set(key string, value Data) {
 
 }
 
+// Db value interface
 type dbValue interface {
 	GetType() string
 }
 
+// String type
 type StringType string
 
 func (st StringType) GetType() string {
 	return "string"
 }
 
+// List type
 type ListType []string
 
 func (lt ListType) GetType() string {
 	return "list"
 }
 
-func InitializeDb() Database {
-	data := make(map[string]Data, 0)
-	return Database{data: data}
+// Stream type
+
+type EntryId string
+
+type Stream struct {
+	Data map[EntryId]map[string]string
+}
+
+func (st Stream) GetType() string {
+	return "stream"
 }
