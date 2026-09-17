@@ -3,9 +3,12 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/codecrafters-io/redis-starter-go/app/db"
 )
 
 type Mapping struct {
@@ -19,7 +22,7 @@ func NewMapping() map[string]Mapping {
 	return mapping
 
 }
-func SetMapping(command Command, mapping map[string]Mapping) error {
+func Set(command Command, database db.Database) error {
 
 	args := command.Args
 	exp := -1
@@ -28,7 +31,7 @@ func SetMapping(command Command, mapping map[string]Mapping) error {
 		return errors.New("Failed to set mapping, not enough args")
 	}
 	key := args[0]
-	value := args[1]
+	value := db.StringType(args[1])
 
 	if len(args) == 4 {
 		option := strings.ToUpper(args[2])
@@ -48,13 +51,13 @@ func SetMapping(command Command, mapping map[string]Mapping) error {
 			return errors.New("Unknown option")
 		}
 	}
-	mapping[key] = Mapping{value: value, time: time.Now(), exp: exp}
+	database[key] = db.Data{Value: value, Time: time.Now(), Exp: exp}
 
 	return nil
 
 }
 
-func GetMapping(command Command, mapping map[string]Mapping) (string, error) {
+func Get(command Command, database db.Database) (db.StringType, error) {
 	args := command.Args
 	fmt.Println(args)
 
@@ -62,18 +65,25 @@ func GetMapping(command Command, mapping map[string]Mapping) (string, error) {
 		return "", errors.New("Failed to get mapping, not enough args")
 	}
 
-	k := args[0]
+	key := args[0]
 
-	if v, ok := mapping[k]; ok {
+	if v, ok := database[key]; ok {
 
 		cTime := time.Now()
 
-		elapsed := int(cTime.Sub(v.time).Milliseconds())
+		elapsed := int(cTime.Sub(v.Time).Milliseconds())
 
-		if (v.exp > 0) && elapsed > v.exp {
+		if (v.Exp > 0) && elapsed > v.Exp {
 			return "", errors.New("Key expired")
 		}
-		return v.value, nil
+
+		if value, ok := v.Value.(db.StringType); ok {
+			return value, nil
+
+		} else {
+			return "", fmt.Errorf("Expecte StringType value, got :%", reflect.TypeOf((v.Value)))
+		}
+
 	} else {
 		return "", errors.New("Missing key")
 	}

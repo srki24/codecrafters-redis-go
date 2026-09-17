@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/codecrafters-io/redis-starter-go/app/db"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
@@ -58,7 +59,7 @@ func ParseCommand(input resp.RESPValue) (Command, error) {
 	}
 }
 
-func GenerateResponse(command Command, mapping map[string]Mapping, listMapping ListMapping) resp.RESPValue {
+func GenerateResponse(command Command, database db.Database) resp.RESPValue {
 	var response resp.RESPValue
 	switch strings.ToUpper(command.Name) {
 	case "ECHO":
@@ -66,7 +67,7 @@ func GenerateResponse(command Command, mapping map[string]Mapping, listMapping L
 	case "PING":
 		response = resp.SimpleString{Data: []byte("PONG")}
 	case "SET":
-		err := SetMapping(command, mapping)
+		err := Set(command, database)
 		if err != nil {
 			fmt.Println(err)
 			break
@@ -74,7 +75,7 @@ func GenerateResponse(command Command, mapping map[string]Mapping, listMapping L
 		response = resp.SimpleString{Data: []byte("OK")}
 
 	case "GET":
-		if v, err := GetMapping(command, mapping); err == nil {
+		if v, err := Get(command, database); err == nil {
 			response = resp.BulkString{Data: []byte(v)}
 		} else {
 			fmt.Println(err)
@@ -82,30 +83,30 @@ func GenerateResponse(command Command, mapping map[string]Mapping, listMapping L
 		}
 
 	case "RPUSH":
-		err := ListPush(command, listMapping, true)
+		err := ListPush(command, database, true)
 		if err != nil {
 			fmt.Println(err)
 		}
-		response = resp.Integer{Data: GetNrElems(command, listMapping)}
+		response = resp.Integer{Data: GetNrElems(command, database)}
 
 	case "LPUSH":
-		err := ListPush(command, listMapping, false)
+		err := ListPush(command, database, false)
 		if err != nil {
 			fmt.Println(err)
 		}
-		response = resp.Integer{Data: GetNrElems(command, listMapping)}
+		response = resp.Integer{Data: GetNrElems(command, database)}
 
 	case "LRANGE":
-		data, err := LRange(command, listMapping)
+		data, err := LRange(command, database)
 		if err != nil {
 			fmt.Println(err)
 		}
 		response = resp.NewArray(data)
 	case "LLEN":
-		response = resp.Integer{Data: GetNrElems(command, listMapping)}
+		response = resp.Integer{Data: GetNrElems(command, database)}
 	case "LPOP":
 		var data []string
-		data, err := ListPop(command, listMapping)
+		data, err := ListPop(command, database)
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -115,7 +116,7 @@ func GenerateResponse(command Command, mapping map[string]Mapping, listMapping L
 			response = resp.NewArray(data)
 		}
 	case "BLPOP":
-		data, err := ListBLPop(command, listMapping)
+		data, err := ListBLPop(command, database)
 		if err != nil {
 			fmt.Println(err)
 			response = resp.NewNullArray()
@@ -123,6 +124,13 @@ func GenerateResponse(command Command, mapping map[string]Mapping, listMapping L
 			response = resp.NewArray(data)
 
 		}
+	case "TYPE":
+		data, err := Type(command, database)
+		if err != nil {
+			fmt.Println(err)
+		}
+		response = resp.SimpleString{Data: []byte(data)}
+
 	default:
 		panic(fmt.Sprintf("Unknown command: %s", command.Name))
 	}

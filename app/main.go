@@ -7,10 +7,11 @@ import (
 	"os"
 
 	"github.com/codecrafters-io/redis-starter-go/app/cmd"
+	"github.com/codecrafters-io/redis-starter-go/app/db"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
-func handleConn(conn net.Conn, mapping map[string]cmd.Mapping, listMapping cmd.ListMapping) {
+func handleConn(conn net.Conn, db db.Database) {
 	defer conn.Close()
 
 read:
@@ -31,7 +32,7 @@ read:
 		if err != nil {
 			fmt.Println(err)
 		}
-		response := cmd.GenerateResponse(command, mapping, listMapping)
+		response := cmd.GenerateResponse(command, db)
 
 		conn.Write(response.Serialize())
 	}
@@ -46,9 +47,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	mapping := cmd.NewMapping()
-	listMapping := cmd.NewListMapping()
-
+	db := db.InitializeDb()
 	for {
 
 		conn, err := l.Accept()
@@ -56,7 +55,7 @@ func main() {
 			fmt.Println("Error accepting connection: ", err.Error())
 			os.Exit(1)
 		}
-		go handleConn(conn, mapping, listMapping)
+		go handleConn(conn, db)
 	}
 
 }

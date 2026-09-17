@@ -2,20 +2,16 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
+	"reflect"
 	"slices"
 	"strconv"
 	"time"
+
+	"github.com/codecrafters-io/redis-starter-go/app/db"
 )
 
-type ListMapping = map[string][]string
-
-func NewListMapping() ListMapping {
-	mapping := make(ListMapping)
-	return mapping
-
-}
-
-func ListPush(cmd Command, lst ListMapping, right bool) error {
+func ListPush(cmd Command, database db.Database, right bool) error {
 	args := cmd.Args
 	if len(args) < 2 {
 		return errors.New("Failed to push to the list, not enough args")
@@ -27,34 +23,40 @@ func ListPush(cmd Command, lst ListMapping, right bool) error {
 		slices.Reverse(values)
 	}
 
-	if data, ok := lst[key]; ok {
-		var v []string
-		if right {
-			v = append(data, values...)
+	if data, ok := database[key]; ok {
+		if val, ok := data.Value.(db.ListType); ok {
+
+			if right {
+				values = append(val, values...)
+			} else {
+				values = append(values, val...)
+			}
 		} else {
-			v = append(values, data...)
+			return fmt.Errorf("Expecte ListType value, got :%", reflect.TypeOf((data.Value)))
+
 		}
-		lst[key] = v
-	} else {
-		lst[key] = values
 	}
+	database[key] = db.Data{Value: db.ListType(values), Time: time.Now(), Exp: -1}
 
 	return nil
 }
 
-func GetNrElems(cmd Command, lst ListMapping) int {
+func GetNrElems(cmd Command, database db.Database) int {
 	args := cmd.Args
 	if len(args) < 1 {
 		return 0
 	}
+	key := args[0]
+	if data, ok := database[key]; ok {
+		if val, ok := data.Value.(db.ListType); ok {
+			return len(val)
 
-	if v, ok := lst[args[0]]; ok {
-		return len(v)
+		}
 	}
 	return 0
 }
 
-func LRange(cmd Command, lst ListMapping) ([]string, error) {
+func LRange(cmd Command, database db.Database) ([]string, error) {
 
 	args := cmd.Args
 	if len(args) < 3 {
@@ -73,26 +75,31 @@ func LRange(cmd Command, lst ListMapping) ([]string, error) {
 		return nil, err
 	}
 
-	if data, ok := lst[key]; ok {
-		nrElements := len(data)
+	if data, ok := database[key]; ok {
+		if val, ok := data.Value.(db.ListType); ok {
 
-		if fromIdx < 0 {
-			fromIdx = max(0, nrElements+fromIdx)
+			nrElements := len(val)
+
+			if fromIdx < 0 {
+				fromIdx = max(0, nrElements+fromIdx)
+			}
+
+			if toIdx < 0 {
+				toIdx = max(0, nrElements+toIdx+1)
+			} else {
+				toIdx = min(toIdx+1, nrElements)
+			}
+
+			return val[fromIdx:toIdx], nil
 		}
+		return nil, fmt.Errorf("Expecte ListType value, got :%", reflect.TypeOf((data.Value)))
 
-		if toIdx < 0 {
-			toIdx = max(0, nrElements+toIdx+1)
-		} else {
-			toIdx = min(toIdx+1, nrElements)
-		}
-
-		return data[fromIdx:toIdx], nil
 	}
 	return nil, errors.New("Non existing list")
 
 }
 
-func ListPop(cmd Command, lst ListMapping) ([]string, error) {
+func ListPop(cmd Command, database db.Database) ([]string, error) {
 	args := cmd.Args
 	if len(args) < 1 {
 		return nil, errors.New("Failed to get pop element, not enough args")
@@ -109,19 +116,25 @@ func ListPop(cmd Command, lst ListMapping) ([]string, error) {
 		toPop = newPop
 	}
 
-	if data, ok := lst[key]; ok {
-		if len(data) == 0 {
-			return nil, errors.New("No data to pop")
+	if data, ok := database[key]; ok {
+		if val, ok := data.Value.(db.ListType); ok {
+			if len(val) == 0 {
+				return nil, errors.New("No data to pop")
+			}
+			toPop = min(toPop, len(val))
+			currVal := database[key]
+			currVal.Value = val[toPop:]
+			database[key] = currVal
+
+			return val[:toPop], nil
 		}
-		toPop = min(toPop, len(data))
-		lst[key] = data[toPop:]
-		return data[:toPop], nil
+		return nil, fmt.Errorf("Expecte ListType value, got :%", reflect.TypeOf((data.Value)))
 	}
 	return nil, errors.New("List doesn,t exist")
 
 }
 
-func ListBLPop(cmd Command, lst ListMapping) ([]string, error) {
+func ListBLPop(cmd Command, database db.Database) ([]string, error) {
 	args := cmd.Args
 	if len(args) < 2 {
 		return nil, errors.New("Couldnt block pop, not enough args")
@@ -139,7 +152,7 @@ func ListBLPop(cmd Command, lst ListMapping) ([]string, error) {
 	start := time.Now()
 
 	for {
-		value, err := ListPop(popCmd, lst)
+		value, err := ListPop(popCmd, database)
 		if err == nil {
 			return []string{key, value[0]}, nil
 		}
