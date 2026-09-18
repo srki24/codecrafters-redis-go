@@ -97,3 +97,15 @@ func (v Integer) Serialize() []byte {
 func (v Integer) GetStringData() string {
 	return strconv.Itoa(v.Data)
 }
+
+type SimpleError struct {
+	Data string
+}
+
+func (v SimpleError) Serialize() []byte {
+	return fmt.Appendf(nil, "-%s\r\n", v.Data)
+}
+
+func (v SimpleError) GetStringData() string {
+	return v.Data
+}

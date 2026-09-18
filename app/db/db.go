@@ -58,10 +58,15 @@ func (lt ListType) GetType() string {
 
 // Stream type
 
-type EntryId string
+type EntryId struct {
+	MillisecondsTime int
+	SequenceNumber   int
+}
 
 type Stream struct {
-	Data map[EntryId]map[string]string
+	Data             map[EntryId]map[string]string
+	MillisecondsTime int
+	SequenceNumber   int
 }
 
 func (st Stream) GetType() string {

@@ -134,8 +134,10 @@ func GenerateResponse(command Command, database *db.Database) resp.RESPValue {
 		data, err := xadd(command, database)
 		if err != nil {
 			fmt.Println(err)
+			response = resp.SimpleError{Data: err.Error()}
+		} else {
+			response = resp.BulkString{Data: []byte(data)}
 		}
-		response = resp.BulkString{Data: []byte(data)}
 
 	default:
 		panic(fmt.Sprintf("Unknown command: %s", command.Name))
