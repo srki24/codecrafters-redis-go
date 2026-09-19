@@ -10,8 +10,29 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/db"
 )
 
+func parseParts(id string, streamMs int, streamSeq int) (msTime, seqNr int, err error) {
+	parts := strings.Split(id, "-")
+	if len(parts) != 2 {
+		return msTime, seqNr, fmt.Errorf("ERR Invalid entry. Should be in millisecondsTime-sequenceNumber format, got %s", id)
+	}
+
+	msTime, err = strconv.Atoi(parts[0])
+
+	if parts[1] == "*" {
+		if msTime == streamMs {
+			seqNr = streamSeq + 1
+		}
+	} else {
+		seqNr, err = strconv.Atoi(parts[1])
+	}
+
+	if (msTime < streamMs) || (msTime == streamMs) && (seqNr <= streamSeq) {
+		err = errors.New("ERR The ID specified in XADD is equal or smaller than the target stream top item")
+	}
+	return msTime, seqNr, err
+}
+
 func parseId(id string, value db.DbValue) (entryId db.EntryId, err error) {
-	var msTime, seqNr int
 	if value == nil {
 		// New stream defaults to
 		value = db.Stream{}
@@ -29,41 +50,16 @@ func parseId(id string, value db.DbValue) (entryId db.EntryId, err error) {
 	}
 
 	if id == "*" {
-		return db.EntryId{
-				MillisecondsTime: stream.MillisecondsTime,
-				SequenceNumber:   stream.SequenceNumber + 1},
-			nil
-	}
-	parts := strings.Split(id, "-")
-
-	if len(parts) != 2 {
-		return entryId, fmt.Errorf("ERR Invalid entry. Should be in millisecondsTime-sequenceNumber format, got %s", id)
-	}
-
-	msTime, err = strconv.Atoi(parts[0])
-
-	if err != nil {
-		return entryId, err
-	}
-
-	if parts[1] == "*" {
-		if msTime <= stream.MillisecondsTime {
-			seqNr += 1
+		entryId.MillisecondsTime = int(time.Now().UnixMilli())
+		if entryId.MillisecondsTime <= stream.MillisecondsTime {
+			entryId.SequenceNumber = stream.SequenceNumber + 1
 		}
+	} else {
+		entryId.MillisecondsTime, entryId.SequenceNumber, err = parseParts(id, stream.MillisecondsTime, stream.SequenceNumber)
 
-		return db.EntryId{
-				MillisecondsTime: msTime,
-				SequenceNumber:   seqNr},
-			nil
 	}
 
-	seqNr, err = strconv.Atoi(parts[1])
-
-	if err != nil {
-		return entryId, err
-	}
-	entryId = db.EntryId{MillisecondsTime: msTime, SequenceNumber: seqNr}
-	return entryId, nil
+	return entryId, err
 }
 
 func xadd(cmd Command, database *db.Database) (string, error) {
@@ -114,12 +110,6 @@ func xadd(cmd Command, database *db.Database) (string, error) {
 
 	// Existing stream
 	stream := data.Value.(db.Stream)
-
-	if (entryId.MillisecondsTime < stream.MillisecondsTime) ||
-		((entryId.MillisecondsTime == stream.MillisecondsTime) &&
-			(entryId.SequenceNumber <= stream.SequenceNumber)) {
-		return "", errors.New("ERR The ID specified in XADD is equal or smaller than the target stream top item")
-	}
 
 	stream.MillisecondsTime = entryId.MillisecondsTime
 	stream.SequenceNumber = entryId.SequenceNumber
