@@ -51,18 +51,18 @@ func parseId(id string, value db.DbValue) (entryId db.EntryId, err error) {
 
 	if id == "*" {
 		entryId.MillisecondsTime = int(time.Now().UnixMilli())
-		if entryId.MillisecondsTime <= stream.MillisecondsTime {
-			entryId.SequenceNumber = stream.SequenceNumber + 1
+		if entryId.MillisecondsTime <= stream.LatestMs {
+			entryId.SequenceNumber = stream.LatestSeqNr + 1
 		}
 	} else {
-		entryId.MillisecondsTime, entryId.SequenceNumber, err = parseParts(id, stream.MillisecondsTime, stream.SequenceNumber)
+		entryId.MillisecondsTime, entryId.SequenceNumber, err = parseParts(id, stream.LatestMs, stream.LatestSeqNr)
 
 	}
 
 	return entryId, err
 }
 
-func xadd(cmd Command, database *db.Database) (string, error) {
+func Xadd(cmd Command, database *db.Database) (string, error) {
 	args := cmd.Args
 
 	if len(args) < 4 {
@@ -72,13 +72,13 @@ func xadd(cmd Command, database *db.Database) (string, error) {
 	key := args[0]
 	id := args[1]
 
-	streamMapping := make(map[string]string)
+	entries := []db.Entry{}
 
 	for i := 2; i < len(args); i = i + 2 {
-		k := args[i]
-		v := args[i+1]
-		streamMapping[k] = v
+		entry := db.Entry{Key: args[i], Value: args[i+1]}
+		entries = append(entries, entry)
 	}
+
 	data, keyExists := database.Get(key)
 
 	entryId, err := parseId(id, data.Value)
@@ -88,13 +88,13 @@ func xadd(cmd Command, database *db.Database) (string, error) {
 	}
 	// create new stream
 	if !keyExists {
-		streamData := make(map[db.EntryId]map[string]string)
-		streamData[entryId] = streamMapping
+		streamData := make(map[db.EntryId][]db.Entry)
+		streamData[entryId] = entries
 
 		stream := db.Stream{
-			Data:             streamData,
-			MillisecondsTime: entryId.MillisecondsTime,
-			SequenceNumber:   entryId.SequenceNumber,
+			Data:        streamData,
+			LatestMs:    entryId.MillisecondsTime,
+			LatestSeqNr: entryId.SequenceNumber,
 		}
 
 		data := db.Data{
@@ -104,19 +104,75 @@ func xadd(cmd Command, database *db.Database) (string, error) {
 		}
 
 		database.Set(key, data)
-		return entryId.Id(), nil
+		return entryId.String(), nil
 
 	}
 
 	// Existing stream
 	stream := data.Value.(db.Stream)
 
-	stream.MillisecondsTime = entryId.MillisecondsTime
-	stream.SequenceNumber = entryId.SequenceNumber
-	stream.Data[entryId] = streamMapping
+	stream.LatestMs = entryId.MillisecondsTime
+	stream.LatestSeqNr = entryId.SequenceNumber
+	stream.Data[entryId] = entries
 
 	data.Value = stream
 	database.Set(key, data)
 
-	return entryId.Id(), nil
+	return entryId.String(), nil
+}
+
+func parseKey(key string, isStart bool) string {
+	var msTimeStr, seqNrStr string
+	parts := strings.Split(key, "-")
+	if len(parts) == 2 {
+		msTimeStr = parts[0]
+		seqNrStr = parts[1]
+	} else {
+		msTimeStr = key
+
+		if isStart {
+			seqNrStr = "0"
+		} else {
+			seqNrStr = strconv.Itoa(^int(0))
+		}
+	}
+
+	return fmt.Sprintf("%s-%s", msTimeStr, seqNrStr)
+
+}
+func Xrange(cmd Command, database *db.Database) (out []map[string][]string, err error) {
+
+	args := cmd.Args
+	if len(args) != 3 {
+		return
+	}
+
+	key := args[0]
+	fromId := parseKey(args[1], true)
+	toId := parseKey(args[2], false)
+
+	data, keyExists := database.Get(key)
+	if !keyExists {
+		err = errors.New("Err key doesn't exist")
+		return out, err
+	}
+
+	stream, isStream := data.Value.(db.Stream)
+	if !isStream {
+		err = errors.New("Err key exist but it's not a stream")
+		return out, err
+	}
+
+	for entryId, dbEntries := range stream.Data {
+
+		if entryId.String() >= fromId && entryId.String() <= toId {
+			outEntries := []string{}
+			for _, dbEntry := range dbEntries {
+				outEntries = append(outEntries, dbEntry.Key, dbEntry.Value)
+			}
+
+			out = append(out, map[string][]string{entryId.String(): outEntries})
+		}
+	}
+	return out, err
 }

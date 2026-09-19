@@ -8,7 +8,7 @@ import (
 
 type RESPValue interface {
 	Serialize() []byte
-	GetStringData() string
+	fmt.Stringer
 }
 
 type SimpleString struct {
@@ -20,10 +20,6 @@ func (v SimpleString) Serialize() []byte {
 }
 
 func (v SimpleString) String() string {
-	return string(v.Data)
-}
-
-func (v SimpleString) GetStringData() string {
 	return string(v.Data)
 }
 
@@ -40,10 +36,6 @@ func (v BulkString) Serialize() []byte {
 		return fmt.Appendf(nil, "$-1\r\n")
 	}
 	return fmt.Appendf(nil, "$%d\r\n%s\r\n", len(v.Data), v.Data)
-}
-
-func (v BulkString) GetStringData() string {
-	return string(v.Data)
 }
 
 type Array struct {
@@ -65,10 +57,10 @@ func (v Array) Serialize() []byte {
 	return out
 }
 
-func (v Array) GetStringData() string {
+func (v Array) String() string {
 	var data []string
 	for _, rv := range v.Data {
-		data = append(data, rv.GetStringData())
+		data = append(data, rv.String())
 	}
 	return strings.Join(data, ",")
 }
@@ -80,6 +72,11 @@ func NewArray(data []string) Array {
 		arr.Data = append(arr.Data, BulkString{[]byte(dp)})
 	}
 	return arr
+}
+
+func NewRespArray(data ...RESPValue) Array {
+	return Array{Data: data}
+
 }
 func NewNullArray() Array {
 	return Array{IsNull: true}
@@ -94,7 +91,7 @@ func (v Integer) Serialize() []byte {
 
 }
 
-func (v Integer) GetStringData() string {
+func (v Integer) String() string {
 	return strconv.Itoa(v.Data)
 }
 
@@ -106,6 +103,6 @@ func (v SimpleError) Serialize() []byte {
 	return fmt.Appendf(nil, "-%s\r\n", v.Data)
 }
 
-func (v SimpleError) GetStringData() string {
+func (v SimpleError) String() string {
 	return v.Data
 }

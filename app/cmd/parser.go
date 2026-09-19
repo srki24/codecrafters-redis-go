@@ -15,7 +15,7 @@ type Command struct {
 }
 
 func parseStringCommand(input resp.RESPValue) (Command, error) {
-	cmd := input.GetStringData()
+	cmd := input.String()
 	if len(cmd) == 0 {
 		return Command{}, errors.New("missing input data")
 	}
@@ -35,13 +35,13 @@ func parseArrayCommand(input resp.Array) (Command, error) {
 	inputCmd := input.Data[0]
 	switch inputCmd := inputCmd.(type) {
 	case resp.SimpleString, resp.BulkString:
-		cmd = inputCmd.GetStringData()
+		cmd = inputCmd.String()
 	default:
 		return Command{}, fmt.Errorf("First element of a command must be either BulkString or SimpleString, got %T", inputCmd)
 	}
 
 	for _, v := range input.Data[1:] {
-		args = append(args, v.GetStringData())
+		args = append(args, v.String())
 	}
 
 	return Command{cmd, args}, nil
@@ -69,10 +69,10 @@ func GenerateResponse(command Command, database *db.Database) resp.RESPValue {
 	case "SET":
 		err := Set(command, database)
 		if err != nil {
-			fmt.Println(err)
-			break
+			response = resp.SimpleError{Data: err.Error()}
+		} else {
+			response = resp.SimpleString{Data: []byte("OK")}
 		}
-		response = resp.SimpleString{Data: []byte("OK")}
 
 	case "GET":
 		if v, err := Get(command, database); err == nil {
@@ -85,16 +85,18 @@ func GenerateResponse(command Command, database *db.Database) resp.RESPValue {
 	case "RPUSH":
 		err := ListPush(command, database, true)
 		if err != nil {
-			fmt.Println(err)
+			response = resp.SimpleError{Data: err.Error()}
+		} else {
+			response = resp.Integer{Data: GetNrElems(command, database)}
 		}
-		response = resp.Integer{Data: GetNrElems(command, database)}
 
 	case "LPUSH":
 		err := ListPush(command, database, false)
 		if err != nil {
-			fmt.Println(err)
+			response = resp.SimpleError{Data: err.Error()}
+		} else {
+			response = resp.Integer{Data: GetNrElems(command, database)}
 		}
-		response = resp.Integer{Data: GetNrElems(command, database)}
 
 	case "LRANGE":
 		data, err := LRange(command, database)
@@ -108,12 +110,13 @@ func GenerateResponse(command Command, database *db.Database) resp.RESPValue {
 		var data []string
 		data, err := ListPop(command, database)
 		if err != nil {
-			fmt.Println(err)
-		}
-		if len(data) == 1 {
-			response = resp.BulkString{Data: []byte(data[0])}
+			response = resp.SimpleError{Data: err.Error()}
 		} else {
-			response = resp.NewArray(data)
+			if len(data) == 1 {
+				response = resp.BulkString{Data: []byte(data[0])}
+			} else {
+				response = resp.NewArray(data)
+			}
 		}
 	case "BLPOP":
 		data, err := ListBLPop(command, database)
@@ -122,21 +125,38 @@ func GenerateResponse(command Command, database *db.Database) resp.RESPValue {
 			response = resp.NewNullArray()
 		} else {
 			response = resp.NewArray(data)
-
 		}
 	case "TYPE":
 		data, err := Type(command, database)
 		if err != nil {
-			fmt.Println(err)
+			response = resp.SimpleError{Data: err.Error()}
+		} else {
+			response = resp.SimpleString{Data: []byte(data)}
 		}
-		response = resp.SimpleString{Data: []byte(data)}
 	case "XADD":
-		data, err := xadd(command, database)
+		data, err := Xadd(command, database)
 		if err != nil {
-			fmt.Println(err)
 			response = resp.SimpleError{Data: err.Error()}
 		} else {
 			response = resp.BulkString{Data: []byte(data)}
+		}
+	case "XRANGE":
+		data, err := Xrange(command, database)
+		if err != nil {
+			response = resp.SimpleError{Data: err.Error()}
+		} else {
+			respEntries := []resp.RESPValue{}
+			for _, entry := range data {
+				for k, v := range entry {
+					entryId := resp.BulkString{Data: []byte(k)}
+					entryValue := resp.NewArray(v)
+					entry := resp.NewRespArray(entryId, entryValue)
+					respEntries = append(respEntries, entry)
+
+				}
+				response = resp.NewRespArray(respEntries...)
+
+			}
 		}
 
 	default:
