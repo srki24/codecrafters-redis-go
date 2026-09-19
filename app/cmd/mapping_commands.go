@@ -3,7 +3,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -70,7 +69,7 @@ func Get(command Command, database *db.Database) (db.StringType, error) {
 			return value, nil
 
 		} else {
-			return "", fmt.Errorf("Expecte StringType value, got :%", reflect.TypeOf((v.Value)))
+			return "", fmt.Errorf("Expecte StringType value, got :%T", v.Value)
 		}
 
 	} else {

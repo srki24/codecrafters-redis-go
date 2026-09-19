@@ -3,7 +3,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"slices"
 	"strconv"
 	"time"
@@ -32,7 +31,7 @@ func ListPush(cmd Command, database *db.Database, right bool) error {
 				values = append(values, val...)
 			}
 		} else {
-			return fmt.Errorf("Expecte ListType value, got :%", reflect.TypeOf((data.Value)))
+			return fmt.Errorf("Expecte ListType value, got :%T", data.Value)
 
 		}
 	}
@@ -92,7 +91,7 @@ func LRange(cmd Command, database *db.Database) ([]string, error) {
 
 			return val[fromIdx:toIdx], nil
 		}
-		return nil, fmt.Errorf("Expecte ListType value, got :%", reflect.TypeOf((data.Value)))
+		return nil, fmt.Errorf("Expecte ListType value, got :%T", data.Value)
 
 	}
 	return nil, errors.New("Non existing list")
@@ -127,7 +126,7 @@ func ListPop(cmd Command, database *db.Database) ([]string, error) {
 
 			return val[:toPop], nil
 		}
-		return nil, fmt.Errorf("Expecte ListType value, got :%", reflect.TypeOf((data.Value)))
+		return nil, fmt.Errorf("Expecte ListType value, got :%T", data.Value)
 	}
 	return nil, errors.New("List doesn,t exist")
 

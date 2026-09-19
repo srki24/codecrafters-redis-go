@@ -1,13 +1,14 @@
 package db
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
 
 // Data field
 type Data struct {
-	Value dbValue
+	Value DbValue
 	Time  time.Time
 	Exp   int
 }
@@ -38,7 +39,7 @@ func (db *Database) Set(key string, value Data) {
 }
 
 // Db value interface
-type dbValue interface {
+type DbValue interface {
 	GetType() string
 }
 
@@ -61,6 +62,10 @@ func (lt ListType) GetType() string {
 type EntryId struct {
 	MillisecondsTime int
 	SequenceNumber   int
+}
+
+func (id EntryId) Id() string {
+	return fmt.Sprintf("%d-%d", id.MillisecondsTime, id.SequenceNumber)
 }
 
 type Stream struct {
