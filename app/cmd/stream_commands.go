@@ -10,6 +10,9 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/db"
 )
 
+const maxDateMillis = "253402300799000"
+const maxSeq = int(^uint(0) >> 1)
+
 func parseParts(id string, streamMs int, streamSeq int) (msTime, seqNr int, err error) {
 	parts := strings.Split(id, "-")
 	if len(parts) != 2 {
@@ -78,7 +81,6 @@ func Xadd(cmd Command, database *db.Database) (string, error) {
 		entry := db.Entry{Key: args[i], Value: args[i+1]}
 		entries = append(entries, entry)
 	}
-
 	data, keyExists := database.Get(key)
 
 	entryId, err := parseId(id, data.Value)
@@ -128,13 +130,23 @@ func parseKey(key string, isStart bool) string {
 		msTimeStr = parts[0]
 		seqNrStr = parts[1]
 	} else {
-		msTimeStr = key
 
-		if isStart {
+		if key == "-" && isStart {
+			msTimeStr = "0"
 			seqNrStr = "0"
-		} else {
-			seqNrStr = strconv.Itoa(^int(0))
+		} else if key == "+" && !isStart {
+			msTimeStr = maxDateMillis
+		} else { // just key provided
+			msTimeStr = key
+
+			if isStart {
+				seqNrStr = "0"
+			} else {
+				seqNrStr = strconv.Itoa(maxSeq)
+			}
+
 		}
+
 	}
 
 	return fmt.Sprintf("%s-%s", msTimeStr, seqNrStr)
@@ -164,7 +176,6 @@ func Xrange(cmd Command, database *db.Database) (out []map[string][]string, err 
 	}
 
 	for entryId, dbEntries := range stream.Data {
-
 		if entryId.String() >= fromId && entryId.String() <= toId {
 			outEntries := []string{}
 			for _, dbEntry := range dbEntries {
