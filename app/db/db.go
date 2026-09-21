@@ -68,12 +68,18 @@ func (id EntryId) String() string {
 	return fmt.Sprintf("%d-%d", id.MillisecondsTime, id.SequenceNumber)
 }
 
-type Entry struct {
+type EntryData struct {
 	Key   string
 	Value string
 }
+
+type StreamData struct {
+	Id    EntryId
+	Entry []EntryData
+}
+
 type Stream struct {
-	Data        map[EntryId][]Entry
+	Data        []StreamData
 	LatestMs    int
 	LatestSeqNr int
 }

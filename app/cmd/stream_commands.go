@@ -75,10 +75,10 @@ func Xadd(cmd Command, database *db.Database) (string, error) {
 	key := args[0]
 	id := args[1]
 
-	entries := []db.Entry{}
+	entries := []db.EntryData{}
 
 	for i := 2; i < len(args); i = i + 2 {
-		entry := db.Entry{Key: args[i], Value: args[i+1]}
+		entry := db.EntryData{Key: args[i], Value: args[i+1]}
 		entries = append(entries, entry)
 	}
 	data, keyExists := database.Get(key)
@@ -90,8 +90,8 @@ func Xadd(cmd Command, database *db.Database) (string, error) {
 	}
 	// create new stream
 	if !keyExists {
-		streamData := make(map[db.EntryId][]db.Entry)
-		streamData[entryId] = entries
+		var streamData []db.StreamData
+		streamData = append(streamData, db.StreamData{Id: entryId, Entry: entries})
 
 		stream := db.Stream{
 			Data:        streamData,
@@ -115,7 +115,7 @@ func Xadd(cmd Command, database *db.Database) (string, error) {
 
 	stream.LatestMs = entryId.MillisecondsTime
 	stream.LatestSeqNr = entryId.SequenceNumber
-	stream.Data[entryId] = entries
+	stream.Data = append(stream.Data, db.StreamData{Id: entryId, Entry: entries})
 
 	data.Value = stream
 	database.Set(key, data)
@@ -152,6 +152,7 @@ func parseKey(key string, isStart bool) string {
 	return fmt.Sprintf("%s-%s", msTimeStr, seqNrStr)
 
 }
+
 func Xrange(cmd Command, database *db.Database) (out []map[string][]string, err error) {
 
 	args := cmd.Args
@@ -175,14 +176,14 @@ func Xrange(cmd Command, database *db.Database) (out []map[string][]string, err 
 		return out, err
 	}
 
-	for entryId, dbEntries := range stream.Data {
-		if entryId.String() >= fromId && entryId.String() <= toId {
+	for _, streamData := range stream.Data {
+		if streamData.Id.String() >= fromId && streamData.Id.String() <= toId {
 			outEntries := []string{}
-			for _, dbEntry := range dbEntries {
+			for _, dbEntry := range streamData.Entry {
 				outEntries = append(outEntries, dbEntry.Key, dbEntry.Value)
 			}
 
-			out = append(out, map[string][]string{entryId.String(): outEntries})
+			out = append(out, map[string][]string{streamData.Id.String(): outEntries})
 		}
 	}
 	return out, err
