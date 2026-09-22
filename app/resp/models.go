@@ -82,6 +82,21 @@ func NewNullArray() Array {
 	return Array{IsNull: true}
 }
 
+func NewArrayFromEntries(data []map[string][]string) Array {
+	respEntries := []RESPValue{}
+
+	for _, entry := range data {
+		for k, v := range entry {
+			entryId := BulkString{Data: []byte(k)}
+			entryValue := NewArray(v)
+			entry := Array{Data: []RESPValue{entryId, entryValue}}
+			respEntries = append(respEntries, entry)
+
+		}
+	}
+	return Array{Data: respEntries}
+}
+
 type Integer struct {
 	Data int
 }

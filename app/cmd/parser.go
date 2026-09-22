@@ -145,22 +145,25 @@ func GenerateResponse(command Command, database *db.Database) resp.RESPValue {
 		if err != nil {
 			response = resp.SimpleError{Data: err.Error()}
 		} else {
-			respEntries := []resp.RESPValue{}
-			for _, entry := range data {
-				for k, v := range entry {
-					entryId := resp.BulkString{Data: []byte(k)}
-					entryValue := resp.NewArray(v)
-					entry := resp.NewRespArray(entryId, entryValue)
-					respEntries = append(respEntries, entry)
+			response = resp.NewArrayFromEntries(data)
+		}
 
-				}
-				response = resp.NewRespArray(respEntries...)
-
+	case "XREAD":
+		{
+			key, data, err := Xread(command, database)
+			if err != nil {
+				fmt.Println(err)
+				response = resp.SimpleError{Data: err.Error()}
+			} else {
+				response = resp.NewArrayFromEntries(data)
+				response = resp.Array{Data: []resp.RESPValue{resp.BulkString{Data: []byte(key)}, response}}
+				response = resp.Array{Data: []resp.RESPValue{response}}
 			}
 		}
 
 	default:
 		panic(fmt.Sprintf("Unknown command: %s", command.Name))
+
 	}
 	return response
 }

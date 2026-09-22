@@ -188,3 +188,19 @@ func Xrange(cmd Command, database *db.Database) (out []map[string][]string, err 
 	}
 	return out, err
 }
+
+func Xread(cmd Command, database *db.Database) (key string, out []map[string][]string, err error) {
+	args := cmd.Args
+	if len(args) != 3 {
+		return
+	}
+
+	key = args[1]
+	fromId := args[2]
+	toId := "+"
+
+	newArgs := []string{key, fromId, toId}
+	newCmd := Command{"XRANGE", newArgs}
+	out, err = Xrange(newCmd, database)
+	return key, out, err
+}
