@@ -145,7 +145,12 @@ func GenerateResponse(command Command, database *db.Database) resp.RESPValue {
 		if err != nil {
 			response = resp.SimpleError{Data: err.Error()}
 		} else {
-			response = resp.NewArrayFromEntries(data)
+			out := []resp.RESPValue{}
+			for _, stream := range data {
+				arr := resp.NewArrayFromStream(stream)
+				out = append(out, arr)
+			}
+			response = resp.Array{Data: out}
 		}
 
 	case "XREAD":
@@ -155,7 +160,14 @@ func GenerateResponse(command Command, database *db.Database) resp.RESPValue {
 				fmt.Println(err)
 				response = resp.SimpleError{Data: err.Error()}
 			} else {
-				response = resp.NewArrayFromEntries(data)
+				fmt.Println(data)
+				out := []resp.RESPValue{}
+				for _, stream := range data {
+					arr := resp.NewArrayFromStream(stream)
+					out = append(out, arr)
+				}
+				fmt.Println(out)
+				response = resp.Array{Data: out}
 				response = resp.Array{Data: []resp.RESPValue{resp.BulkString{Data: []byte(key)}, response}}
 				response = resp.Array{Data: []resp.RESPValue{response}}
 			}

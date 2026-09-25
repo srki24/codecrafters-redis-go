@@ -91,7 +91,7 @@ func Xadd(cmd Command, database *db.Database) (string, error) {
 	// create new stream
 	if !keyExists {
 		var streamData []db.StreamData
-		streamData = append(streamData, db.StreamData{Id: entryId, Entry: entries})
+		streamData = append(streamData, db.StreamData{Id: entryId, Data: entries})
 
 		stream := db.Stream{
 			Data:        streamData,
@@ -115,7 +115,7 @@ func Xadd(cmd Command, database *db.Database) (string, error) {
 
 	stream.LatestMs = entryId.MillisecondsTime
 	stream.LatestSeqNr = entryId.SequenceNumber
-	stream.Data = append(stream.Data, db.StreamData{Id: entryId, Entry: entries})
+	stream.Data = append(stream.Data, db.StreamData{Id: entryId, Data: entries})
 
 	data.Value = stream
 	database.Set(key, data)
@@ -153,10 +153,11 @@ func parseKey(key string, isStart bool) string {
 
 }
 
-func Xrange(cmd Command, database *db.Database) (out []map[string][]string, err error) {
+func Xrange(cmd Command, database *db.Database) (out []db.StreamData, err error) {
 
 	args := cmd.Args
 	if len(args) != 3 {
+		err = errors.New("Err XRABGE Failed to get stream, not enough args")
 		return
 	}
 
@@ -178,23 +179,19 @@ func Xrange(cmd Command, database *db.Database) (out []map[string][]string, err 
 
 	for _, streamData := range stream.Data {
 		if streamData.Id.String() >= fromId && streamData.Id.String() <= toId {
-			outEntries := []string{}
-			for _, dbEntry := range streamData.Entry {
-				outEntries = append(outEntries, dbEntry.Key, dbEntry.Value)
-			}
 
-			out = append(out, map[string][]string{streamData.Id.String(): outEntries})
+			out = append(out, streamData)
 		}
 	}
 	return out, err
 }
 
-func Xread(cmd Command, database *db.Database) (key string, out []map[string][]string, err error) {
+func Xread(cmd Command, database *db.Database) (key string, out []db.StreamData, err error) {
 	args := cmd.Args
-	if len(args) != 3 {
+	if len(args) < 3 {
+		err = errors.New("Err XREAD Failed to get stream, not enough args")
 		return
 	}
-
 	key = args[1]
 	fromId := args[2]
 	toId := "+"

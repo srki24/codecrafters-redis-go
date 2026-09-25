@@ -74,8 +74,8 @@ type EntryData struct {
 }
 
 type StreamData struct {
-	Id    EntryId
-	Entry []EntryData
+	Id   EntryId
+	Data []EntryData
 }
 
 type Stream struct {
