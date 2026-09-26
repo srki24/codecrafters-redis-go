@@ -186,18 +186,30 @@ func Xrange(cmd Command, database *db.Database) (out []db.StreamData, err error)
 	return out, err
 }
 
-func Xread(cmd Command, database *db.Database) (key string, out []db.StreamData, err error) {
+func Xread(cmd Command, database *db.Database) (keys []string, out [][]db.StreamData, err error) {
 	args := cmd.Args
+
 	if len(args) < 3 {
 		err = errors.New("Err XREAD Failed to get stream, not enough args")
 		return
 	}
-	key = args[1]
-	fromId := args[2]
-	toId := "+"
 
-	newArgs := []string{key, fromId, toId}
-	newCmd := Command{"XRANGE", newArgs}
-	out, err = Xrange(newCmd, database)
-	return key, out, err
+	halfArgs := (len(args) - 1) / 2
+	for i := 1; i <= halfArgs; i++ {
+		streamKey := args[i]
+		fromId := args[i+halfArgs]
+		toId := "+"
+		newArgs := []string{streamKey, fromId, toId}
+		newCmd := Command{"XRANGE", newArgs}
+		streamOut, err := Xrange(newCmd, database)
+		if err != nil {
+			return keys, out, err
+		}
+		out = append(out, streamOut)
+		keys = append(keys, streamKey)
+	}
+	if len(out) != len(keys) {
+		err = errors.New("Err XREAD, number of keys and outputs missmatch")
+	}
+	return keys, out, err
 }

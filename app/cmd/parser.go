@@ -155,21 +155,27 @@ func GenerateResponse(command Command, database *db.Database) resp.RESPValue {
 
 	case "XREAD":
 		{
-			key, data, err := Xread(command, database)
+			keys, outputs, err := Xread(command, database)
 			if err != nil {
 				fmt.Println(err)
 				response = resp.SimpleError{Data: err.Error()}
 			} else {
-				fmt.Println(data)
-				out := []resp.RESPValue{}
-				for _, stream := range data {
-					arr := resp.NewArrayFromStream(stream)
-					out = append(out, arr)
+				streamResponses := []resp.RESPValue{}
+				for i := 0; i < len(keys); i++ {
+					streamValues := []resp.RESPValue{}
+					key := keys[i]
+					streamOutputs := outputs[i]
+					for _, stream := range streamOutputs {
+						arr := resp.NewArrayFromStream(stream)
+						streamValues = append(streamValues, arr)
+					}
+					streamKey := resp.BulkString{Data: []byte(key)}
+					streamValue := resp.Array{Data: streamValues}
+					streamResponses = append(
+						streamResponses,
+						resp.Array{Data: []resp.RESPValue{streamKey, streamValue}})
 				}
-				fmt.Println(out)
-				response = resp.Array{Data: out}
-				response = resp.Array{Data: []resp.RESPValue{resp.BulkString{Data: []byte(key)}, response}}
-				response = resp.Array{Data: []resp.RESPValue{response}}
+				response = resp.Array{Data: streamResponses}
 			}
 		}
 
