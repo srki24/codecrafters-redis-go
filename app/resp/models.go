@@ -84,33 +84,38 @@ func NewNullArray() Array {
 	return Array{IsNull: true}
 }
 
-func NewArrayFromStream(stream db.StreamData) Array {
-	respEntries := []string{}
+// func NewArrayFromStream(stream []db.StreamData) Array {
+// 	respEntries := []string{}
 
-	entryId := BulkString{Data: []byte(stream.Id.String())}
-	for _, e := range stream.Data {
-		respEntries = append(respEntries, e.Key, e.Value)
-
-	}
-	entryValue := NewArray(respEntries)
-	entry := Array{Data: []RESPValue{entryId, entryValue}}
-	return entry
-}
-
-// func NewArrayFromStream(data []db.StreamData) Array {
-// 	respEntries := []RESPValue{}
-
-// 	for _, entry := range data {
-// 		entryId := BulkString{Data: []byte(entry.Id.String())}
-// 		for _, e := range entry.Data {
-// 			entryValue := NewArray([]string{e.Key, e.Value})
-// 			entry := Array{Data: []RESPValue{entryId, entryValue}}
-// 			respEntries = append(respEntries, entry)
-
+// 	for _, s := range stream {
+// 		entryId := BulkString{Data: []byte(s.Id.String())}
+// 		for _, e := range s.Data {
+// 			respEntries = append(respEntries, e.Key, e.Value)
 // 		}
+
 // 	}
-// 	return Array{Data: respEntries}
+// 	entryValue := NewArray(respEntries)
+// 	entry := Array{Data: []RESPValue{entryId, entryValue}}
+// 	return Array{Data: []RESPValue{entry}}
 // }
+
+func NewArrayFromStream(data []db.StreamData) Array {
+	entries := []RESPValue{}
+	for _, entry := range data {
+		respEntries := []string{}
+		for _, e := range entry.Data {
+			entryValue := []string{e.Key, e.Value}
+			respEntries = append(respEntries, entryValue...)
+
+		}
+		entryId := BulkString{Data: []byte(entry.Id.String())}
+		entryValue := NewArray(respEntries)
+		entry := Array{Data: []RESPValue{entryId, entryValue}}
+
+		entries = append(entries, entry)
+	}
+	return Array{Data: entries}
+}
 
 type Integer struct {
 	Data int
