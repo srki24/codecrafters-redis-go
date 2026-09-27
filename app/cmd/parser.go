@@ -159,14 +159,21 @@ func GenerateResponse(command Command, database *db.Database) resp.RESPValue {
 				for i := 0; i < len(keys); i++ {
 					key := keys[i]
 					stream := streams[i]
-
 					streamKey := resp.BulkString{Data: []byte(key)}
 					streamValue := resp.NewArrayFromStream(stream)
+
+					if streamValue.IsNull {
+						continue
+					}
 					streamResponses = append(
 						streamResponses,
 						resp.Array{Data: []resp.RESPValue{streamKey, streamValue}})
 				}
-				response = resp.Array{Data: streamResponses}
+				if len(streamResponses) == 0 {
+					response = resp.NewNullArray()
+				} else {
+					response = resp.Array{Data: streamResponses}
+				}
 			}
 		}
 

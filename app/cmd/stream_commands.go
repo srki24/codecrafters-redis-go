@@ -194,20 +194,69 @@ func Xread(cmd Command, database *db.Database) (keys []string, out [][]db.Stream
 		return
 	}
 
-	halfArgs := (len(args) - 1) / 2
-	for i := 1; i <= halfArgs; i++ {
-		streamKey := args[i]
-		fromId := args[i+halfArgs]
-		toId := "+"
-		newArgs := []string{streamKey, fromId, toId}
-		newCmd := Command{"XRANGE", newArgs}
-		streamOut, err := Xrange(newCmd, database)
-		if err != nil {
-			return keys, out, err
+	timeout := 0
+	xrangeArgs := [][]string{}
+	for i := 0; i < len(args); {
+
+		arg := strings.ToUpper(args[i])
+		switch arg {
+		case "BLOCK":
+			timeout, err = strconv.Atoi(args[i+1])
+			if err != nil {
+				return
+			}
+			i = i + 2
+		case "STREAM":
+			streamKey := args[i+1]
+			fromId := args[i+2]
+			toId := "+"
+			xrangeArgs = append(xrangeArgs, []string{streamKey, fromId, toId})
+			i = i + 3
+		case "STREAMS":
+			i++
+			halfArgs := (len(args) - i) / 2
+			for j := i; j < i+halfArgs; j++ {
+				streamKey := args[j]
+				fromId := args[j+halfArgs] + "0"
+				toId := "+"
+				xrangeArgs = append(xrangeArgs, []string{streamKey, fromId, toId})
+			}
+			i = len(args)
+		default:
+			err = fmt.Errorf("Unknown argument: %s", arg)
+			return
 		}
-		out = append(out, streamOut)
-		keys = append(keys, streamKey)
+
 	}
+	start := time.Now()
+
+	for _, xrangeArg := range xrangeArgs {
+		newCmd := Command{"XRANGE", xrangeArg}
+	blocking:
+		for {
+
+			streamOut, err := Xrange(newCmd, database)
+			if err != nil {
+				return keys, out, err
+			}
+
+			if len(streamOut) == 0 {
+				fmt.Println("Nout found blocking...")
+				end := time.Now()
+				fmt.Println(end.Sub(start).Milliseconds())
+				time.Sleep(time.Second / 2)
+				if (timeout != 0) && int(end.Sub(start).Milliseconds()) < timeout {
+					continue blocking
+				}
+				fmt.Println("Timeout, data not found...")
+			}
+			out = append(out, streamOut)
+			keys = append(keys, xrangeArg[0])
+			break blocking
+		}
+
+	}
+	fmt.Println(out)
 	if len(out) != len(keys) {
 		err = errors.New("Err XREAD, number of keys and outputs missmatch")
 	}

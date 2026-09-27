@@ -77,6 +77,13 @@ func NewArray(data []string) Array {
 }
 
 func NewRespArray(data ...RESPValue) Array {
+	for _, v := range data {
+		if arr, ok := v.(Array); ok {
+			if arr.IsNull {
+				return arr
+			}
+		}
+	}
 	return Array{Data: data}
 
 }
@@ -113,6 +120,9 @@ func NewArrayFromStream(data []db.StreamData) Array {
 		entry := Array{Data: []RESPValue{entryId, entryValue}}
 
 		entries = append(entries, entry)
+	}
+	if len(entries) == 0 {
+		return NewNullArray()
 	}
 	return Array{Data: entries}
 }
