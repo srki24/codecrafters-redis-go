@@ -194,7 +194,7 @@ func Xread(cmd Command, database *db.Database) (keys []string, out [][]db.Stream
 		return
 	}
 
-	timeout := 0
+	timeout := -1
 	xrangeArgs := [][]string{}
 	for i := 0; i < len(args); {
 
@@ -240,12 +240,12 @@ func Xread(cmd Command, database *db.Database) (keys []string, out [][]db.Stream
 				return keys, out, err
 			}
 
-			if len(streamOut) == 0 {
+			if len(streamOut) == 0 && timeout != -1 {
 				fmt.Println("Nout found blocking...")
 				end := time.Now()
 				fmt.Println(end.Sub(start).Milliseconds())
 				time.Sleep(time.Second / 2)
-				if (timeout != 0) && int(end.Sub(start).Milliseconds()) < timeout {
+				if (timeout == 0) || int(end.Sub(start).Milliseconds()) < timeout {
 					continue blocking
 				}
 				fmt.Println("Timeout, data not found...")
