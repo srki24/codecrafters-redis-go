@@ -91,21 +91,6 @@ func NewNullArray() Array {
 	return Array{IsNull: true}
 }
 
-// func NewArrayFromStream(stream []db.StreamData) Array {
-// 	respEntries := []string{}
-
-// 	for _, s := range stream {
-// 		entryId := BulkString{Data: []byte(s.Id.String())}
-// 		for _, e := range s.Data {
-// 			respEntries = append(respEntries, e.Key, e.Value)
-// 		}
-
-// 	}
-// 	entryValue := NewArray(respEntries)
-// 	entry := Array{Data: []RESPValue{entryId, entryValue}}
-// 	return Array{Data: []RESPValue{entry}}
-// }
-
 func NewArrayFromStream(data []db.StreamData) Array {
 	entries := []RESPValue{}
 	for _, entry := range data {

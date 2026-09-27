@@ -186,6 +186,18 @@ func Xrange(cmd Command, database *db.Database) (out []db.StreamData, err error)
 	return out, err
 }
 
+func xreadParseId(key string) (string, string) {
+	toId := "+"
+	fromId := key
+	if key != "$" {
+		parts := strings.Split(key, "-")
+		ms, _ := strconv.Atoi(parts[0])
+		seq, _ := strconv.Atoi(parts[1])
+		fromId = fmt.Sprintf("%d-%d", ms, seq+1)
+	}
+	return fromId, toId
+
+}
 func Xread(cmd Command, database *db.Database) (keys []string, out [][]db.StreamData, err error) {
 	args := cmd.Args
 
@@ -208,8 +220,7 @@ func Xread(cmd Command, database *db.Database) (keys []string, out [][]db.Stream
 			i = i + 2
 		case "STREAM":
 			streamKey := args[i+1]
-			fromId := args[i+2]
-			toId := "+"
+			fromId, toId := xreadParseId(args[i+2])
 			xrangeArgs = append(xrangeArgs, []string{streamKey, fromId, toId})
 			i = i + 3
 		case "STREAMS":
@@ -217,8 +228,7 @@ func Xread(cmd Command, database *db.Database) (keys []string, out [][]db.Stream
 			halfArgs := (len(args) - i) / 2
 			for j := i; j < i+halfArgs; j++ {
 				streamKey := args[j]
-				fromId := args[j+halfArgs] + "0"
-				toId := "+"
+				fromId, toId := xreadParseId(args[j+halfArgs])
 				xrangeArgs = append(xrangeArgs, []string{streamKey, fromId, toId})
 			}
 			i = len(args)
@@ -235,20 +245,31 @@ func Xread(cmd Command, database *db.Database) (keys []string, out [][]db.Stream
 	blocking:
 		for {
 
+			// special case need only newly inserted data need to get max existing key
+			if newCmd.Args[1] == "$" {
+				streamOut, err := Xrange(newCmd, database)
+				if err != nil {
+					return keys, out, err
+				}
+				if len(streamOut) == 0 {
+					newCmd.Args[1] = "0"
+				} else {
+					maxId := streamOut[len(streamOut)-1].Id
+					newCmd.Args[1] = fmt.Sprintf("%d-%d", maxId.MillisecondsTime, maxId.SequenceNumber+1)
+					fmt.Println(newCmd)
+				}
+
+			}
 			streamOut, err := Xrange(newCmd, database)
 			if err != nil {
 				return keys, out, err
 			}
 
 			if len(streamOut) == 0 && timeout != -1 {
-				fmt.Println("Nout found blocking...")
 				end := time.Now()
-				fmt.Println(end.Sub(start).Milliseconds())
-				time.Sleep(time.Second / 2)
 				if (timeout == 0) || int(end.Sub(start).Milliseconds()) < timeout {
 					continue blocking
 				}
-				fmt.Println("Timeout, data not found...")
 			}
 			out = append(out, streamOut)
 			keys = append(keys, xrangeArg[0])
@@ -256,7 +277,6 @@ func Xread(cmd Command, database *db.Database) (keys []string, out [][]db.Stream
 		}
 
 	}
-	fmt.Println(out)
 	if len(out) != len(keys) {
 		err = errors.New("Err XREAD, number of keys and outputs missmatch")
 	}
