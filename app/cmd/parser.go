@@ -198,7 +198,22 @@ func GenerateResponse(command Command, database *db.Database) (response resp.RES
 		{
 			isTransaction = true
 			response = resp.SimpleString{Data: []byte("OK")}
+		}
+	case "EXEC":
+		{
+			var responses []resp.RESPValue
 
+			if !isTransaction {
+				response = resp.SimpleError{Data: "ERR EXEC without MULTI"}
+			} else {
+
+				for _, cmd := range queue {
+					r := GenerateResponse(cmd, database)
+					responses = append(responses, r)
+				}
+				response = resp.Array{Data: responses}
+				isTransaction = false
+			}
 		}
 
 	default:
