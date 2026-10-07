@@ -90,10 +90,10 @@ func Incr(command Command, database *db.Database) (int, error) {
 	if !hasKey {
 		value = 1 // initializing at 0
 	} else {
-		dbVal, isString := data.Value.(db.StringType)
+		dbVal := data.Value.(db.StringType)
 
 		nrVal, err := strconv.Atoi(string(dbVal))
-		if err != nil || !isString {
+		if err != nil {
 			return 0, errors.New("ERR value is not an integer or out of range")
 		}
 
