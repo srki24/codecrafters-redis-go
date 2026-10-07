@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/codecrafters-io/redis-starter-go/app/db"
@@ -60,8 +61,11 @@ func ParseCommand(input resp.RESPValue) (Command, error) {
 }
 
 func GenerateResponse(command Command, database *db.Database, queue *[]Command, transaction *bool) (response resp.RESPValue) {
+	var breakTransactionCmd = []string{"EXEC", "DISCARD"}
 
-	if *transaction && strings.ToUpper(command.Name) != "EXEC" {
+	breakTransaction := slices.Contains(breakTransactionCmd, strings.ToUpper(command.Name))
+
+	if *transaction && !breakTransaction {
 		*queue = append(*queue, command)
 		response = resp.SimpleString{Data: []byte("QUEUED")}
 		return
@@ -210,6 +214,16 @@ func GenerateResponse(command Command, database *db.Database, queue *[]Command, 
 					responses = append(responses, r)
 				}
 				response = resp.Array{Data: responses}
+				clear(*queue)
+			}
+		}
+	case "DISCARD":
+		{
+			if !*transaction {
+				response = resp.SimpleError{Data: "ERR DISCARD without MULTI"}
+			} else {
+				response = resp.SimpleString{Data: []byte("OK")}
+				*transaction = false
 				clear(*queue)
 			}
 		}
