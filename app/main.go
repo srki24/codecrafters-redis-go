@@ -13,6 +13,8 @@ import (
 
 func handleConn(conn net.Conn, db *db.Database) {
 	defer conn.Close()
+	var queue []cmd.Command
+	var transaction bool = false
 
 read:
 	for {
@@ -32,7 +34,8 @@ read:
 		if err != nil {
 			fmt.Println(err)
 		}
-		response := cmd.GenerateResponse(command, db)
+
+		response := cmd.GenerateResponse(command, db, &queue, &transaction)
 
 		conn.Write(response.Serialize())
 	}

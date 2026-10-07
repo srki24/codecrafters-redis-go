@@ -3,15 +3,11 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/codecrafters-io/redis-starter-go/app/db"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
-
-var IS_TRANSACTION = false
-var ALWAYS_RUN_COMMANDS = []string{"EXEC", "GET"}
 
 type Command struct {
 	Name string
@@ -63,13 +59,10 @@ func ParseCommand(input resp.RESPValue) (Command, error) {
 	}
 }
 
-func GenerateResponse(command Command, database *db.Database) (response resp.RESPValue) {
-	var queue []Command
+func GenerateResponse(command Command, database *db.Database, queue *[]Command, transaction *bool) (response resp.RESPValue) {
 
-	forceExecute := slices.Contains(ALWAYS_RUN_COMMANDS, strings.ToUpper(command.Name))
-
-	if IS_TRANSACTION && !forceExecute {
-		queue = append(queue, command)
+	if *transaction && strings.ToUpper(command.Name) != "EXEC" {
+		*queue = append(*queue, command)
 		response = resp.SimpleString{Data: []byte("QUEUED")}
 		return
 	}
@@ -201,23 +194,23 @@ func GenerateResponse(command Command, database *db.Database) (response resp.RES
 		}
 	case "MULTI":
 		{
-			IS_TRANSACTION = true
+			*transaction = true
 			response = resp.SimpleString{Data: []byte("OK")}
 		}
 	case "EXEC":
 		{
 			var responses []resp.RESPValue
-			if !IS_TRANSACTION {
+			if !*transaction {
 				response = resp.SimpleError{Data: "ERR EXEC without MULTI"}
 			} else {
-
-				for _, cmd := range queue {
-					r := GenerateResponse(cmd, database)
+				fmt.Println(queue)
+				*transaction = false
+				for _, cmd := range *queue {
+					r := GenerateResponse(cmd, database, queue, transaction)
 					responses = append(responses, r)
 				}
 				response = resp.Array{Data: responses}
-				clear(queue)
-				IS_TRANSACTION = false
+				clear(*queue)
 			}
 		}
 
