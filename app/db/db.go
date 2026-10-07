@@ -43,6 +43,13 @@ type DbValue interface {
 	GetType() string
 }
 
+// Int type
+type IntegerType int
+
+func (it IntegerType) GetType() string {
+	return "integer"
+}
+
 // String type
 type StringType string
 

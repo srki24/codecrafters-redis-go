@@ -176,6 +176,15 @@ func GenerateResponse(command Command, database *db.Database) resp.RESPValue {
 				}
 			}
 		}
+	case "INCR":
+		{
+			val, err := Incr(command, database)
+			if err != nil {
+				response = resp.SimpleError{Data: err.Error()}
+			} else {
+				response = resp.Integer{Data: val}
+			}
+		}
 
 	default:
 		panic(fmt.Sprintf("Unknown command: %s", command.Name))

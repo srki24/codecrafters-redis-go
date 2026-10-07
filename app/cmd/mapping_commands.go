@@ -19,7 +19,16 @@ func Set(command Command, database *db.Database) error {
 		return errors.New("Failed to set mapping, not enough args")
 	}
 	key := args[0]
-	value := db.StringType(args[1])
+
+	nr, err := strconv.Atoi(args[1])
+
+	var value db.DbValue
+
+	if err != nil {
+		value = db.StringType(args[1])
+	} else {
+		value = db.IntegerType(nr)
+	}
 
 	if len(args) == 4 {
 		option := strings.ToUpper(args[2])
@@ -47,7 +56,6 @@ func Set(command Command, database *db.Database) error {
 
 func Get(command Command, database *db.Database) (db.StringType, error) {
 	args := command.Args
-	fmt.Println(args)
 
 	if len(args) < 1 {
 		return "", errors.New("Failed to get mapping, not enough args")
@@ -75,4 +83,32 @@ func Get(command Command, database *db.Database) (db.StringType, error) {
 	} else {
 		return "", errors.New("Missing key")
 	}
+}
+
+func Incr(command Command, database *db.Database) (int, error) {
+	args := command.Args
+
+	if len(args) < 1 {
+		return 0, errors.New("Failed to INCR, not enough args")
+	}
+	key := args[0]
+
+	data, hasKey := database.Get(key)
+
+	if !hasKey {
+		return 0, fmt.Errorf("Missing key %s", key)
+	}
+
+	value, isIntege := data.Value.(db.IntegerType)
+
+	incrVal := value + 1
+	if !isIntege {
+		return 0, fmt.Errorf("Value is not of the string typer: %s", incrVal)
+	}
+
+	data.Value = value + 1
+
+	database.Set(key, data)
+	return int(incrVal), nil
+
 }
