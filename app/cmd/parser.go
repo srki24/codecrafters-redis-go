@@ -213,6 +213,7 @@ func GenerateResponse(command Command, database *db.Database) (response resp.RES
 				}
 				response = resp.Array{Data: responses}
 				clear(queue)
+				IS_TRANSACTION = false
 			}
 		}
 
