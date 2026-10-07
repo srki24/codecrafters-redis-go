@@ -59,8 +59,16 @@ func ParseCommand(input resp.RESPValue) (Command, error) {
 	}
 }
 
-func GenerateResponse(command Command, database *db.Database) resp.RESPValue {
-	var response resp.RESPValue
+func GenerateResponse(command Command, database *db.Database) (response resp.RESPValue) {
+	var queue []Command
+	var isTransaction = false
+
+	if isTransaction {
+		queue = append(queue, command)
+		response = resp.SimpleString{Data: []byte("QUEUED")}
+		return
+	}
+
 	switch strings.ToUpper(command.Name) {
 	case "ECHO":
 		response = resp.BulkString{Data: []byte(command.Args[0])}
@@ -186,10 +194,16 @@ func GenerateResponse(command Command, database *db.Database) resp.RESPValue {
 				response = resp.Integer{Data: val}
 			}
 		}
+	case "MULTI":
+		{
+			isTransaction = true
+			response = resp.SimpleString{Data: []byte("OK")}
+
+		}
 
 	default:
 		panic(fmt.Sprintf("Unknown command: %s", command.Name))
 
 	}
-	return response
+	return
 }
