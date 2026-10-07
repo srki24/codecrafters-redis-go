@@ -96,7 +96,12 @@ func Incr(command Command, database *db.Database) (int, error) {
 	data, hasKey := database.Get(key)
 
 	if !hasKey {
-		return 0, fmt.Errorf("Missing key %s", key)
+		newCmd := Command{"SET", []string{key, "0"}}
+		err := Set(newCmd, database)
+
+		if err != nil {
+			return 0, err
+		}
 	}
 
 	value, isIntege := data.Value.(db.IntegerType)
