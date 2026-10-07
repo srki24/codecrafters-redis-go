@@ -91,13 +91,10 @@ func Incr(command Command, database *db.Database) (int, error) {
 		value = 1 // initializing at 0
 	} else {
 		dbVal, isString := data.Value.(db.StringType)
-		if !isString {
-			return 0, fmt.Errorf("Value is not of the string type: %T", value)
-		}
 
 		nrVal, err := strconv.Atoi(string(dbVal))
-		if err != nil {
-			return 0, fmt.Errorf("Couldn't convert value to integer: %s", string(dbVal))
+		if err != nil || !isString {
+			return 0, errors.New("ERR value is not an integer or out of range")
 		}
 
 		value = nrVal + 1
