@@ -19,16 +19,7 @@ func Set(command Command, database *db.Database) error {
 		return errors.New("Failed to set mapping, not enough args")
 	}
 	key := args[0]
-
-	nr, err := strconv.Atoi(args[1])
-
-	var value db.DbValue
-
-	if err != nil {
-		value = db.StringType(args[1])
-	} else {
-		value = db.IntegerType(nr)
-	}
+	value := db.StringType(args[1])
 
 	if len(args) == 4 {
 		option := strings.ToUpper(args[2])
@@ -86,6 +77,7 @@ func Get(command Command, database *db.Database) (db.StringType, error) {
 }
 
 func Incr(command Command, database *db.Database) (int, error) {
+	var value int
 	args := command.Args
 
 	if len(args) < 1 {
@@ -96,24 +88,23 @@ func Incr(command Command, database *db.Database) (int, error) {
 	data, hasKey := database.Get(key)
 
 	if !hasKey {
-		newCmd := Command{"SET", []string{key, "0"}}
-		err := Set(newCmd, database)
-		fmt.Println(err)
-		if err != nil {
-			return 0, err
+		value = 1 // initializing at 0
+	} else {
+		dbVal, isString := data.Value.(db.StringType)
+		if !isString {
+			return 0, fmt.Errorf("Value is not of the string type: %T", value)
 		}
+
+		nrVal, err := strconv.Atoi(string(dbVal))
+		if err != nil {
+			return 0, fmt.Errorf("Couldn't convert value to integer: %s", string(dbVal))
+		}
+
+		value = nrVal + 1
 	}
 
-	value, isIntege := data.Value.(db.IntegerType)
-
-	incrVal := value + 1
-	if !isIntege {
-		return 0, fmt.Errorf("Value is not of the string typer: %s", incrVal)
-	}
-
-	data.Value = value + 1
-
+	data.Value = db.StringType(strconv.Itoa(value))
 	database.Set(key, data)
-	return int(incrVal), nil
+	return int(value), nil
 
 }
