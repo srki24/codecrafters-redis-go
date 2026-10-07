@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/codecrafters-io/redis-starter-go/app/db"
@@ -10,6 +11,7 @@ import (
 )
 
 var IS_TRANSACTION = false
+var ALWAYS_RUN_COMMANDS = []string{"EXEC", "GET"}
 
 type Command struct {
 	Name string
@@ -64,7 +66,9 @@ func ParseCommand(input resp.RESPValue) (Command, error) {
 func GenerateResponse(command Command, database *db.Database) (response resp.RESPValue) {
 	var queue []Command
 
-	if IS_TRANSACTION && strings.ToUpper(command.Name) != "EXEC" {
+	forceExecute := slices.Contains(ALWAYS_RUN_COMMANDS, strings.ToUpper(command.Name))
+
+	if IS_TRANSACTION && !forceExecute {
 		queue = append(queue, command)
 		response = resp.SimpleString{Data: []byte("QUEUED")}
 		return
