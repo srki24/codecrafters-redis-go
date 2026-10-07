@@ -9,6 +9,8 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
+var IS_TRANSACTION = false
+
 type Command struct {
 	Name string
 	Args []string
@@ -61,9 +63,8 @@ func ParseCommand(input resp.RESPValue) (Command, error) {
 
 func GenerateResponse(command Command, database *db.Database) (response resp.RESPValue) {
 	var queue []Command
-	var isTransaction = false
 
-	if isTransaction {
+	if IS_TRANSACTION && strings.ToUpper(command.Name) != "EXEC" {
 		queue = append(queue, command)
 		response = resp.SimpleString{Data: []byte("QUEUED")}
 		return
@@ -196,14 +197,13 @@ func GenerateResponse(command Command, database *db.Database) (response resp.RES
 		}
 	case "MULTI":
 		{
-			isTransaction = true
+			IS_TRANSACTION = true
 			response = resp.SimpleString{Data: []byte("OK")}
 		}
 	case "EXEC":
 		{
 			var responses []resp.RESPValue
-
-			if !isTransaction {
+			if !IS_TRANSACTION {
 				response = resp.SimpleError{Data: "ERR EXEC without MULTI"}
 			} else {
 
@@ -212,7 +212,7 @@ func GenerateResponse(command Command, database *db.Database) (response resp.RES
 					responses = append(responses, r)
 				}
 				response = resp.Array{Data: responses}
-				isTransaction = false
+				clear(queue)
 			}
 		}
 
@@ -220,5 +220,6 @@ func GenerateResponse(command Command, database *db.Database) (response resp.RES
 		panic(fmt.Sprintf("Unknown command: %s", command.Name))
 
 	}
+	fmt.Println(response)
 	return
 }
