@@ -98,7 +98,7 @@ func Incr(command Command, database *db.Database) (int, error) {
 	if !hasKey {
 		newCmd := Command{"SET", []string{key, "0"}}
 		err := Set(newCmd, database)
-
+		fmt.Println(err)
 		if err != nil {
 			return 0, err
 		}
