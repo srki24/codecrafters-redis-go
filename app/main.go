@@ -11,15 +11,15 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
-func handleConn(conn net.Conn, db *db.Database) {
-	defer conn.Close()
-	var queue []cmd.Command
-	var transaction bool = false
+func handleConn(connetion net.Conn, db *db.Database) {
+	defer connetion.Close()
+
+	connStatus := cmd.NewConnStatus()
 
 read:
 	for {
 
-		reader := bufio.NewReader(conn)
+		reader := bufio.NewReader(connetion)
 		var buff []byte = make([]byte, 2048)
 
 		n, err := reader.Read(buff)
@@ -35,9 +35,9 @@ read:
 			fmt.Println(err)
 		}
 
-		response := cmd.GenerateResponse(command, db, &queue, &transaction)
+		response := cmd.GenerateResponse(command, db, &connStatus)
 
-		conn.Write(response.Serialize())
+		connetion.Write(response.Serialize())
 	}
 
 }
