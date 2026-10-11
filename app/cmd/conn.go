@@ -8,7 +8,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
-var endTransactionCommands = []string{"EXEC", "DISCARD"}
+var endTransactionCommands = []string{"EXEC", "DISCARD", "WATCH"}
 
 type ConnStatus struct {
 	queue       []Command
