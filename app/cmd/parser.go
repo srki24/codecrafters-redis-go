@@ -204,6 +204,14 @@ func GenerateResponse(command Command, database *db.Database, connState *ConnSta
 		{
 			response = connState.Discard()
 		}
+	case "WATCH":
+		{
+			if connState.IsTransaction() {
+				response = resp.SimpleError{Data: "ERR WATCH inside MULTI is not allowed"}
+			} else {
+				response = resp.SimpleString{Data: []byte("OK")}
+			}
+		}
 
 	default:
 		panic(fmt.Sprintf("Unknown command: %s", command.Name))
