@@ -87,8 +87,7 @@ func (cs *ConnStatus) Discard() error {
 	if !cs.IsTransaction() {
 		return errors.New("ERR DISCARD without MULTI")
 	} else {
-		cs.transaction = false
-		clear(cs.queue)
+		cs.EndTransaction()
 	}
 	return nil
 }
@@ -110,4 +109,14 @@ func (cs *ConnStatus) Watch(cmd Command) error {
 
 	}
 	return nil
+}
+
+func (cs *ConnStatus) Unwatch(cmd Command) {
+	args := cmd.Args
+	if len(args) < 1 {
+		return
+	}
+
+	key := args[0]
+	delete(cs.watching, key)
 }
