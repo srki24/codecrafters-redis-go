@@ -39,7 +39,7 @@ func Set(command Command, database *db.Database) error {
 			return errors.New("Unknown option")
 		}
 	}
-	database.Set(key, db.Data{Value: value, Time: time.Now(), Exp: exp})
+	database.Set(key, db.Data{Value: value, CreatedTime: time.Now(), Exp: exp})
 
 	return nil
 
@@ -47,7 +47,6 @@ func Set(command Command, database *db.Database) error {
 
 func Get(command Command, database *db.Database) (db.StringType, error) {
 	args := command.Args
-
 	if len(args) < 1 {
 		return "", errors.New("Failed to get mapping, not enough args")
 	}
@@ -58,7 +57,7 @@ func Get(command Command, database *db.Database) (db.StringType, error) {
 
 		cTime := time.Now()
 
-		elapsed := int(cTime.Sub(v.Time).Milliseconds())
+		elapsed := int(cTime.Sub(v.CreatedTime).Milliseconds())
 
 		if (v.Exp > 0) && elapsed > v.Exp {
 			return "", errors.New("Key expired")

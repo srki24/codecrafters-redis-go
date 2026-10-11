@@ -100,9 +100,9 @@ func Xadd(cmd Command, database *db.Database) (string, error) {
 		}
 
 		data := db.Data{
-			Value: stream,
-			Time:  time.Now(),
-			Exp:   -1,
+			Value:       stream,
+			CreatedTime: time.Now(),
+			Exp:         -1,
 		}
 
 		database.Set(key, data)

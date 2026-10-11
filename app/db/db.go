@@ -8,9 +8,10 @@ import (
 
 // Data field
 type Data struct {
-	Value DbValue
-	Time  time.Time
-	Exp   int
+	Value       DbValue
+	CreatedTime time.Time
+	UpdatedTime time.Time
+	Exp         int
 }
 
 // Database
@@ -34,6 +35,7 @@ func InitializeDb() Database {
 func (db *Database) Set(key string, value Data) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
+	value.UpdatedTime = time.Now()
 	db.data[key] = value
 
 }

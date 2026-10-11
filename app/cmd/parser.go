@@ -198,16 +198,39 @@ func GenerateResponse(command Command, database *db.Database, connState *ConnSta
 		}
 	case "EXEC":
 		{
-			response = connState.Commit(database)
+			if connState.IsWatchingKeyUpdated(database) {
+				response = resp.NewNullArray()
+				connState.EndTransaction()
+			} else {
+
+				err, queue := connState.Commit(database)
+
+				if err != nil {
+					response = resp.SimpleError{Data: err.Error()}
+				} else {
+
+					var responses []resp.RESPValue
+					for _, cmd := range queue {
+						r := GenerateResponse(cmd, database, connState)
+						responses = append(responses, r)
+					}
+					response = resp.Array{Data: responses}
+				}
+			}
+
 		}
 	case "DISCARD":
 		{
-			response = connState.Discard()
+			if err := connState.Discard(); err != nil {
+				response = resp.SimpleError{Data: err.Error()}
+			} else {
+				response = resp.SimpleString{Data: []byte("OK")}
+			}
 		}
 	case "WATCH":
 		{
-			if connState.IsTransaction() {
-				response = resp.SimpleError{Data: "ERR WATCH inside MULTI is not allowed"}
+			if err := connState.Watch(command); err != nil {
+				response = resp.SimpleError{Data: err.Error()}
 			} else {
 				response = resp.SimpleString{Data: []byte("OK")}
 			}

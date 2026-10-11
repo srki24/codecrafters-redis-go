@@ -35,7 +35,7 @@ func ListPush(cmd Command, database *db.Database, right bool) error {
 
 		}
 	}
-	database.Set(key, db.Data{Value: db.ListType(values), Time: time.Now(), Exp: -1})
+	database.Set(key, db.Data{Value: db.ListType(values), CreatedTime: time.Now(), Exp: -1})
 
 	return nil
 }

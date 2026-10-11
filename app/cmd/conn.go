@@ -1,22 +1,27 @@
 package cmd
 
 import (
+	"errors"
+	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/codecrafters-io/redis-starter-go/app/db"
-	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
 var endTransactionCommands = []string{"EXEC", "DISCARD", "WATCH"}
+var canModifyKeyCommands = []string{"SET", "INCR"}
 
 type ConnStatus struct {
 	queue       []Command
 	transaction bool
+	watching    map[string]time.Time
 }
 
 func NewConnStatus() ConnStatus {
-	return ConnStatus{transaction: false}
+	watching := make(map[string]time.Time, 0)
+	return ConnStatus{transaction: false, watching: watching}
 }
 
 func (cs *ConnStatus) QueueCommand(command Command) bool {
@@ -38,29 +43,68 @@ func (cs *ConnStatus) BeginTransaction() {
 	cs.transaction = true
 }
 
-func (cs *ConnStatus) Commit(database *db.Database) (response resp.RESPValue) {
-	var responses []resp.RESPValue
-	if !cs.IsTransaction() {
-		response = resp.SimpleError{Data: "ERR EXEC without MULTI"}
-	} else {
-		cs.transaction = false
-		for _, cmd := range cs.queue {
-			r := GenerateResponse(cmd, database, cs)
-			responses = append(responses, r)
-		}
-		response = resp.Array{Data: responses}
-		clear(cs.queue)
+func (cs *ConnStatus) IsWatchingKeyUpdated(database *db.Database) bool {
+
+	if len(cs.watching) < 1 {
+		return false
 	}
-	return response
+
+	for key, watchSetTime := range cs.watching {
+		fmt.Println(key)
+
+		data, ok := database.Get(key)
+		if !ok {
+			continue // arg doesn't exist in the database
+		}
+
+		fmt.Println(data.UpdatedTime)
+		fmt.Println(watchSetTime)
+		fmt.Println(data.UpdatedTime.Compare(watchSetTime))
+		if data.UpdatedTime.Compare(watchSetTime) == 1 {
+			return true // updated
+		}
+
+	}
+	return false
 }
 
-func (cs *ConnStatus) Discard() (response resp.RESPValue) {
+func (cs *ConnStatus) EndTransaction() {
+	cs.transaction = false
+	clear(cs.queue)
+}
+func (cs *ConnStatus) Commit(database *db.Database) (error, []Command) {
 	if !cs.IsTransaction() {
-		response = resp.SimpleError{Data: "ERR DISCARD without MULTI"}
+		return errors.New("ERR EXEC without MULTI"), nil
+	}
+
+	queue := make([]Command, len(cs.queue))
+	copy(queue, cs.queue)
+	cs.EndTransaction()
+	return nil, queue
+}
+
+func (cs *ConnStatus) Discard() error {
+	if !cs.IsTransaction() {
+		return errors.New("ERR DISCARD without MULTI")
 	} else {
-		response = resp.SimpleString{Data: []byte("OK")}
 		cs.transaction = false
 		clear(cs.queue)
 	}
-	return response
+	return nil
+}
+
+func (cs *ConnStatus) Watch(cmd Command) error {
+	if cs.IsTransaction() {
+		return errors.New("ERR WATCH inside MULTI is not allowed")
+	}
+
+	args := cmd.Args
+
+	if len(args) < 1 {
+		return errors.New("Couldnt watch, key not provided")
+	}
+	key := args[0]
+
+	cs.watching[key] = time.Now()
+	return nil
 }
