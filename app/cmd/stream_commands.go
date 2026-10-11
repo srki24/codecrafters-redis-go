@@ -256,7 +256,6 @@ func Xread(cmd Command, database *db.Database) (keys []string, out [][]db.Stream
 				} else {
 					maxId := streamOut[len(streamOut)-1].Id
 					newCmd.Args[1] = fmt.Sprintf("%d-%d", maxId.MillisecondsTime, maxId.SequenceNumber+1)
-					fmt.Println(newCmd)
 				}
 
 			}

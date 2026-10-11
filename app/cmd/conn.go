@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"errors"
-	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -25,7 +24,6 @@ func NewConnStatus() ConnStatus {
 }
 
 func (cs *ConnStatus) QueueCommand(command Command) bool {
-
 	endTransaction := slices.Contains(endTransactionCommands, strings.ToUpper(command.Name))
 	shouldQueue := cs.IsTransaction() && !endTransaction
 	if shouldQueue {
@@ -50,16 +48,12 @@ func (cs *ConnStatus) IsWatchingKeyUpdated(database *db.Database) bool {
 	}
 
 	for key, watchSetTime := range cs.watching {
-		fmt.Println(key)
 
 		data, ok := database.Get(key)
 		if !ok {
 			continue // arg doesn't exist in the database
 		}
 
-		fmt.Println(data.UpdatedTime)
-		fmt.Println(watchSetTime)
-		fmt.Println(data.UpdatedTime.Compare(watchSetTime))
 		if data.UpdatedTime.Compare(watchSetTime) == 1 {
 			return true // updated
 		}
@@ -70,9 +64,11 @@ func (cs *ConnStatus) IsWatchingKeyUpdated(database *db.Database) bool {
 
 func (cs *ConnStatus) EndTransaction() {
 	cs.transaction = false
-	clear(cs.queue)
+	cs.watching = make(map[string]time.Time)
+
+	cs.queue = nil
 }
-func (cs *ConnStatus) Commit(database *db.Database) (error, []Command) {
+func (cs *ConnStatus) Exec(database *db.Database) (error, []Command) {
 	if !cs.IsTransaction() {
 		return errors.New("ERR EXEC without MULTI"), nil
 	}

@@ -203,8 +203,8 @@ func GenerateResponse(command Command, database *db.Database, connState *ConnSta
 				connState.EndTransaction()
 			} else {
 
-				err, queue := connState.Commit(database)
-
+				err, queue := connState.Exec(database)
+				fmt.Println(queue)
 				if err != nil {
 					response = resp.SimpleError{Data: err.Error()}
 				} else {
