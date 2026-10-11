@@ -103,8 +103,11 @@ func (cs *ConnStatus) Watch(cmd Command) error {
 	if len(args) < 1 {
 		return errors.New("Couldnt watch, key not provided")
 	}
-	key := args[0]
 
-	cs.watching[key] = time.Now()
+	watchingTime := time.Now()
+	for _, key := range args {
+		cs.watching[key] = watchingTime
+
+	}
 	return nil
 }
