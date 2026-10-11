@@ -111,12 +111,6 @@ func (cs *ConnStatus) Watch(cmd Command) error {
 	return nil
 }
 
-func (cs *ConnStatus) Unwatch(cmd Command) {
-	args := cmd.Args
-	if len(args) < 1 {
-		return
-	}
-
-	key := args[0]
-	delete(cs.watching, key)
+func (cs *ConnStatus) Unwatch() {
+	clear(cs.watching)
 }

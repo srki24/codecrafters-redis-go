@@ -237,7 +237,7 @@ func GenerateResponse(command Command, database *db.Database, connState *ConnSta
 		}
 	case "UNWATCH":
 		{
-			connState.Unwatch(command)
+			connState.Unwatch()
 			response = resp.SimpleString{Data: []byte("OK")}
 		}
 
