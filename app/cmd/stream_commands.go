@@ -161,7 +161,7 @@ func Xrange(cmd Command, database *db.Database) (out []db.StreamData, err error)
 
 	args := cmd.Args
 	if len(args) != 3 {
-		err = errors.New("Err XRABGE Failed to get stream, not enough args")
+		err = errors.New("Err XRANGE Failed to get stream, not enough args")
 		return
 	}
 
@@ -183,7 +183,6 @@ func Xrange(cmd Command, database *db.Database) (out []db.StreamData, err error)
 
 	for _, streamData := range stream.Data {
 		if streamData.Id.String() >= fromId && streamData.Id.String() <= toId {
-
 			out = append(out, streamData)
 		}
 	}
