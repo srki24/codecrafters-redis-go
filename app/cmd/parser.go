@@ -114,7 +114,7 @@ func GenerateResponse(command Command, database *db.Database, connState *ConnSta
 		}
 		response = resp.NewArray(data)
 	case "LLEN":
-		response = resp.Integer{Data: GetNrElems(command, database)}
+		response = resp.Integer{Data: GetNumberOfElments(command, database)}
 	case "LPOP":
 		var data []string
 		data, err := ListPop(command, database)

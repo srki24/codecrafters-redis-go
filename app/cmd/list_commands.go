@@ -22,7 +22,9 @@ func ListPush(cmd Command, database *db.Database, right bool) (int, error) {
 	}
 
 	key := args[0]
-	values := args[1:]
+	var values []string
+	copy(args[1:], values)
+
 	if !right {
 		slices.Reverse(values)
 	}
@@ -45,7 +47,7 @@ func ListPush(cmd Command, database *db.Database, right bool) (int, error) {
 	return len(values), nil
 }
 
-func GetNrElems(cmd Command, database *db.Database) int {
+func GetNumberOfElments(cmd Command, database *db.Database) int {
 	args := cmd.Args
 	if len(args) < 1 {
 		return 0

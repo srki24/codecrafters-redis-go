@@ -19,7 +19,7 @@ type ConnStatus struct {
 }
 
 func NewConnStatus() ConnStatus {
-	watching := make(map[string]time.Time, 0)
+	watching := make(map[string]time.Time)
 	return ConnStatus{transaction: false, watching: watching}
 }
 

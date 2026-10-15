@@ -27,8 +27,8 @@ func (db *Database) Get(key string) (Data, bool) {
 	data, ok := db.Data[key]
 	return data, ok
 }
-func InitializeDb() Database {
-	data := make(map[string]Data, 0)
+func NewDatabase() Database {
+	data := make(map[string]Data)
 	return Database{Data: data}
 }
 

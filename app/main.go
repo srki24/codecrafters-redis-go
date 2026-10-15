@@ -55,7 +55,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	db := db.InitializeDb()
+	db := db.NewDatabase()
 	for {
 
 		conn, err := l.Accept()
