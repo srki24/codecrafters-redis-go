@@ -22,8 +22,8 @@ func ListPush(cmd Command, database *db.Database, right bool) (int, error) {
 	}
 
 	key := args[0]
-	var values []string
-	copy(args[1:], values)
+	values := make([]string, len(args[1:]))
+	copy(values, args[1:])
 
 	if !right {
 		slices.Reverse(values)

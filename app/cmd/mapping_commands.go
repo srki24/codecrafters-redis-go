@@ -76,6 +76,8 @@ func Get(command Command, database *db.Database) (db.StringType, error) {
 }
 
 func Incr(command Command, database *db.Database) (int, error) {
+	database.Mu.Lock()
+	defer database.Mu.Unlock()
 	var value int
 	args := command.Args
 
@@ -84,7 +86,7 @@ func Incr(command Command, database *db.Database) (int, error) {
 	}
 	key := args[0]
 
-	data, hasKey := database.Get(key)
+	data, hasKey := database.Data[key]
 
 	if !hasKey {
 		value = 1 // initializing at 0
@@ -100,7 +102,7 @@ func Incr(command Command, database *db.Database) (int, error) {
 	}
 
 	data.Value = db.StringType(strconv.Itoa(value))
-	database.Set(key, data)
+	database.Data[key] = data
 	return int(value), nil
 
 }

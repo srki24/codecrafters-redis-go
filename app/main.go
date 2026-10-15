@@ -2,7 +2,9 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 
@@ -16,28 +18,37 @@ func handleConn(connetion net.Conn, db *db.Database) {
 
 	connStatus := cmd.NewConnStatus()
 
-read:
+	var err error
+
 	for {
+		if err != nil {
+			connetion.Write([]byte(err.Error()))
+			err = nil
+			continue
+		}
 
 		reader := bufio.NewReader(connetion)
 		var buff []byte = make([]byte, 2048)
 
 		n, err := reader.Read(buff)
 
-		if err != nil {
-			fmt.Println(err)
-			continue read
+		if errors.Is(err, io.EOF) {
+			break
 		}
-		request, _, err := resp.Parse(buff[:n])
 
 		if err != nil {
-			fmt.Println(err)
+			continue
+		}
+
+		request, _, err := resp.Parse(buff[:n])
+		if err != nil {
+			continue
 		}
 
 		command, err := cmd.ParseCommand(request)
 
 		if err != nil {
-			fmt.Println(err)
+			continue
 		}
 
 		response := cmd.GenerateResponse(command, db, &connStatus)
