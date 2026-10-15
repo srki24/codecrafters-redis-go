@@ -10,10 +10,15 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/db"
 )
 
-func ListPush(cmd Command, database *db.Database, right bool) error {
+var ErrNotFound = errors.New("not found")
+
+func ListPush(cmd Command, database *db.Database, right bool) (int, error) {
+	database.Mu.Lock()
+	defer database.Mu.Unlock()
+
 	args := cmd.Args
 	if len(args) < 2 {
-		return errors.New("Failed to push to the list, not enough args")
+		return 0, errors.New("Failed to push to the list, not enough args")
 	}
 
 	key := args[0]
@@ -22,7 +27,7 @@ func ListPush(cmd Command, database *db.Database, right bool) error {
 		slices.Reverse(values)
 	}
 
-	if data, ok := database.Get(key); ok {
+	if data, ok := database.Data[key]; ok {
 		if val, ok := data.Value.(db.ListType); ok {
 
 			if right {
@@ -31,13 +36,13 @@ func ListPush(cmd Command, database *db.Database, right bool) error {
 				values = append(values, val...)
 			}
 		} else {
-			return fmt.Errorf("Expecte ListType value, got :%T", data.Value)
+			return 0, fmt.Errorf("Expecte ListType value, got :%T", data.Value)
 
 		}
 	}
-	database.Set(key, db.Data{Value: db.ListType(values), CreatedTime: time.Now(), Exp: -1})
+	database.Data[key] = db.Data{Value: db.ListType(values), CreatedTime: time.Now(), Exp: -1}
 
-	return nil
+	return len(values), nil
 }
 
 func GetNrElems(cmd Command, database *db.Database) int {
@@ -79,6 +84,9 @@ func LRange(cmd Command, database *db.Database) ([]string, error) {
 
 			nrElements := len(val)
 
+			if fromIdx > nrElements {
+				return nil, fmt.Errorf("Index out of range")
+			}
 			if fromIdx < 0 {
 				fromIdx = max(0, nrElements+fromIdx)
 			}
@@ -99,6 +107,10 @@ func LRange(cmd Command, database *db.Database) ([]string, error) {
 }
 
 func ListPop(cmd Command, database *db.Database) ([]string, error) {
+
+	database.Mu.Lock()
+	defer database.Mu.Unlock()
+
 	args := cmd.Args
 	if len(args) < 1 {
 		return nil, errors.New("Failed to get pop element, not enough args")
@@ -114,21 +126,20 @@ func ListPop(cmd Command, database *db.Database) ([]string, error) {
 		}
 		toPop = newPop
 	}
-
-	if data, ok := database.Get(key); ok {
+	if data, ok := database.Data[key]; ok {
 		if val, ok := data.Value.(db.ListType); ok {
 			if len(val) == 0 {
-				return nil, errors.New("No data to pop")
+				return nil, ErrNotFound
 			}
 			toPop = min(toPop, len(val))
 			data.Value = val[toPop:]
-			database.Set(key, data)
+			database.Data[key] = data
 
 			return val[:toPop], nil
 		}
 		return nil, fmt.Errorf("Expecte ListType value, got :%T", data.Value)
 	}
-	return nil, errors.New("List doesn,t exist")
+	return nil, ErrNotFound
 
 }
 
@@ -151,15 +162,20 @@ func ListBLPop(cmd Command, database *db.Database) ([]string, error) {
 
 	for {
 		value, err := ListPop(popCmd, database)
-		if err == nil {
-			return []string{key, value[0]}, nil
+
+		if errors.Is(err, ErrNotFound) {
+			end := time.Now()
+
+			if (timeout != 0) && end.Sub(start).Seconds() > timeout {
+				return nil, errors.New("No data, timed out")
+			}
+			continue
 		}
 
-		end := time.Now()
-
-		if (timeout != 0) && end.Sub(start).Seconds() > timeout {
-			return nil, errors.New("No data, timed out")
+		if err != nil {
+			return nil, err
 		}
+		return []string{key, value[0]}, nil
 
 	}
 

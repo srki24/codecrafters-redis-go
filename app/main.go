@@ -28,7 +28,12 @@ read:
 			fmt.Println(err)
 			continue read
 		}
-		request, _ := resp.Parse(buff[:n])
+		request, _, err := resp.Parse(buff[:n])
+
+		if err != nil {
+			fmt.Println(err)
+		}
+
 		command, err := cmd.ParseCommand(request)
 
 		if err != nil {

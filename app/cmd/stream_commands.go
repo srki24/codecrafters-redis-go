@@ -66,6 +66,10 @@ func parseId(id string, value db.DbValue) (entryId db.EntryId, err error) {
 }
 
 func Xadd(cmd Command, database *db.Database) (string, error) {
+
+	database.Mu.Lock()
+	defer database.Mu.Unlock()
+
 	args := cmd.Args
 
 	if len(args) < 4 {
@@ -81,7 +85,7 @@ func Xadd(cmd Command, database *db.Database) (string, error) {
 		entry := db.EntryData{Key: args[i], Value: args[i+1]}
 		entries = append(entries, entry)
 	}
-	data, keyExists := database.Get(key)
+	data, keyExists := database.Data[key]
 
 	entryId, err := parseId(id, data.Value)
 
@@ -105,7 +109,7 @@ func Xadd(cmd Command, database *db.Database) (string, error) {
 			Exp:         -1,
 		}
 
-		database.Set(key, data)
+		database.Data[key] = data
 		return entryId.String(), nil
 
 	}
@@ -118,7 +122,7 @@ func Xadd(cmd Command, database *db.Database) (string, error) {
 	stream.Data = append(stream.Data, db.StreamData{Id: entryId, Data: entries})
 
 	data.Value = stream
-	database.Set(key, data)
+	database.Data[key] = data
 
 	return entryId.String(), nil
 }

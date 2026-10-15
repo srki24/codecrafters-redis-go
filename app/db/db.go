@@ -16,27 +16,27 @@ type Data struct {
 
 // Database
 type Database struct {
-	data map[string]Data
-	mu   sync.Mutex
+	Data map[string]Data
+	Mu   sync.Mutex
 }
 
 func (db *Database) Get(key string) (Data, bool) {
-	db.mu.Lock()
-	defer db.mu.Unlock()
+	db.Mu.Lock()
+	defer db.Mu.Unlock()
 
-	data, ok := db.data[key]
+	data, ok := db.Data[key]
 	return data, ok
 }
 func InitializeDb() Database {
 	data := make(map[string]Data, 0)
-	return Database{data: data}
+	return Database{Data: data}
 }
 
 func (db *Database) Set(key string, value Data) {
-	db.mu.Lock()
-	defer db.mu.Unlock()
+	db.Mu.Lock()
+	defer db.Mu.Unlock()
 	value.UpdatedTime = time.Now()
-	db.data[key] = value
+	db.Data[key] = value
 
 }
 

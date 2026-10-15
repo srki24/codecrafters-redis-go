@@ -68,7 +68,11 @@ func GenerateResponse(command Command, database *db.Database, connState *ConnSta
 
 	switch strings.ToUpper(command.Name) {
 	case "ECHO":
-		response = resp.BulkString{Data: []byte(command.Args[0])}
+		if len(command.Args) < 1 {
+			response = resp.SimpleError{Data: "No args provided"}
+		} else {
+			response = resp.BulkString{Data: []byte(command.Args[0])}
+		}
 	case "PING":
 		response = resp.SimpleString{Data: []byte("PONG")}
 	case "SET":
@@ -88,19 +92,19 @@ func GenerateResponse(command Command, database *db.Database, connState *ConnSta
 		}
 
 	case "RPUSH":
-		err := ListPush(command, database, true)
+		n, err := ListPush(command, database, true)
 		if err != nil {
 			response = resp.SimpleError{Data: err.Error()}
 		} else {
-			response = resp.Integer{Data: GetNrElems(command, database)}
+			response = resp.Integer{Data: n}
 		}
 
 	case "LPUSH":
-		err := ListPush(command, database, false)
+		n, err := ListPush(command, database, false)
 		if err != nil {
 			response = resp.SimpleError{Data: err.Error()}
 		} else {
-			response = resp.Integer{Data: GetNrElems(command, database)}
+			response = resp.Integer{Data: n}
 		}
 
 	case "LRANGE":
@@ -242,7 +246,7 @@ func GenerateResponse(command Command, database *db.Database, connState *ConnSta
 		}
 
 	default:
-		panic(fmt.Sprintf("Unknown command: %s", command.Name))
+		response = resp.SimpleError{Data: fmt.Sprintf("Unknown command: %s", command.Name)}
 
 	}
 	fmt.Println(response)
