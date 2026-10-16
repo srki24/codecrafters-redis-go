@@ -48,6 +48,7 @@ func (db *Database) get(key string) (Data, bool) {
 	expired := data.expired()
 	if expired {
 		delete(db.data, key)
+		data = Data{}
 	}
 	return data, ok && !expired
 }
