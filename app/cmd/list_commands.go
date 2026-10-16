@@ -13,40 +13,32 @@ import (
 var ErrNotFound = errors.New("not found")
 
 func ListPush(cmd Command, database *db.Database, right bool) (int, error) {
-
 	args := cmd.Args
 	if len(args) < 2 {
 		return 0, errors.New("failed to push to the list, not enough args")
 	}
-
 	key := args[0]
-
 	upd := func(data db.Data, exists bool) (db.Data, int, error) {
 		values := make([]string, len(args[1:]))
 		copy(values, args[1:])
-
 		if !right {
 			slices.Reverse(values)
 		}
-
 		if !exists {
 			def := db.NewData(db.ListType(values), nil)
 			return def, len(values), nil
 		}
-
 		val, ok := data.Value.(db.ListType)
-
 		if !ok {
 			return db.Data{}, 0, fmt.Errorf("expecte ListType value, got :%T", data.Value)
 		}
-
 		if right {
 			values = append(val, values...)
 		} else {
 			values = append(values, val...)
 		}
-
-		return db.Data{Value: db.ListType(values), CreatedTime: time.Now(), Exp: -1}, len(values), nil
+		data.Value = db.ListType(values)
+		return data, len(values), nil
 	}
 
 	out, err := db.Update(

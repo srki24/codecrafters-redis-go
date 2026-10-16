@@ -204,7 +204,7 @@ func GenerateResponse(command Command, database *db.Database, connState *ConnSta
 		}
 	case "EXEC":
 		{
-			if connState.IsWatchingKeyUpdated(database) {
+			if connState.ShouldAbort(database) {
 				response = resp.NewNullArray()
 				connState.EndTransaction()
 			} else {

@@ -40,7 +40,7 @@ func (cs *ConnStatus) BeginTransaction() {
 	cs.transaction = true
 }
 
-func (cs *ConnStatus) IsWatchingKeyUpdated(database *db.Database) bool {
+func (cs *ConnStatus) ShouldAbort(database *db.Database) bool {
 	if len(cs.watching) < 1 {
 		return false
 	}
@@ -50,7 +50,7 @@ func (cs *ConnStatus) IsWatchingKeyUpdated(database *db.Database) bool {
 			if seen.IsZero() {
 				continue // doesn't exist, didn't exist when watch was alled
 			} else {
-				return false
+				return true
 			}
 		}
 		if data.UpdatedTime.After(seen) {
