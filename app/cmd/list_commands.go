@@ -16,7 +16,7 @@ func ListPush(cmd Command, database *db.Database, right bool) (int, error) {
 
 	args := cmd.Args
 	if len(args) < 2 {
-		return 0, errors.New("Failed to push to the list, not enough args")
+		return 0, errors.New("failed to push to the list, not enough args")
 	}
 
 	key := args[0]
@@ -25,19 +25,19 @@ func ListPush(cmd Command, database *db.Database, right bool) (int, error) {
 		values := make([]string, len(args[1:]))
 		copy(values, args[1:])
 
+		if !right {
+			slices.Reverse(values)
+		}
+
 		if !exists {
 			def := db.NewData(db.ListType(values), nil)
 			return def, len(values), nil
 		}
 
-		if !right {
-			slices.Reverse(values)
-		}
-
 		val, ok := data.Value.(db.ListType)
 
 		if !ok {
-			return db.Data{}, 0, fmt.Errorf("Expecte ListType value, got :%T", data.Value)
+			return db.Data{}, 0, fmt.Errorf("expecte ListType value, got :%T", data.Value)
 		}
 
 		if right {
@@ -80,7 +80,7 @@ func LRange(cmd Command, database *db.Database) ([]string, error) {
 
 	args := cmd.Args
 	if len(args) < 3 {
-		return nil, errors.New("Failed to get range, not enough args")
+		return nil, errors.New("failed to get range, not enough args")
 	}
 
 	key := args[0]
@@ -101,7 +101,7 @@ func LRange(cmd Command, database *db.Database) ([]string, error) {
 			nrElements := len(val)
 
 			if fromIdx > nrElements {
-				return nil, fmt.Errorf("Index out of range")
+				return nil, fmt.Errorf("index out of range")
 			}
 			if fromIdx < 0 {
 				fromIdx = max(0, nrElements+fromIdx)
@@ -115,10 +115,10 @@ func LRange(cmd Command, database *db.Database) ([]string, error) {
 
 			return val[fromIdx:toIdx], nil
 		}
-		return nil, fmt.Errorf("Expecte ListType value, got :%T", data.Value)
+		return nil, fmt.Errorf("expecte ListType value, got :%T", data.Value)
 
 	}
-	return nil, errors.New("Non existing list")
+	return nil, ErrNotFound
 
 }
 
@@ -126,7 +126,7 @@ func ListPop(cmd Command, database *db.Database) ([]string, error) {
 
 	args := cmd.Args
 	if len(args) < 1 {
-		return nil, errors.New("Failed to get pop element, not enough args")
+		return nil, errors.New("failed to get pop element, not enough args")
 	}
 
 	key := args[0]
@@ -135,7 +135,7 @@ func ListPop(cmd Command, database *db.Database) ([]string, error) {
 	if len(args) == 2 {
 		newPop, err := strconv.Atoi(args[1])
 		if err != nil {
-			return nil, errors.New("Failed to parse pop argument")
+			return nil, errors.New("failed to parse pop argument")
 		}
 		toPop = newPop
 	}
@@ -147,7 +147,7 @@ func ListPop(cmd Command, database *db.Database) ([]string, error) {
 		}
 		val, ok := data.Value.(db.ListType)
 		if !ok {
-			return db.Data{}, nil, fmt.Errorf("Expecte ListType value, got :%T", data.Value)
+			return db.Data{}, nil, fmt.Errorf("expecte ListType value, got :%T", data.Value)
 		}
 
 		if len(val) == 0 {
@@ -174,7 +174,7 @@ func ListPop(cmd Command, database *db.Database) ([]string, error) {
 func ListBLPop(cmd Command, database *db.Database) ([]string, error) {
 	args := cmd.Args
 	if len(args) < 2 {
-		return nil, errors.New("Couldnt block pop, not enough args")
+		return nil, errors.New("couldnt block pop, not enough args")
 	}
 
 	key := args[0]
@@ -195,7 +195,7 @@ func ListBLPop(cmd Command, database *db.Database) ([]string, error) {
 			end := time.Now()
 
 			if (timeout != 0) && end.Sub(start).Seconds() > timeout {
-				return nil, errors.New("No data, timed out")
+				return nil, errors.New("no data, timed out")
 			}
 			time.Sleep(500 * time.Microsecond)
 			continue

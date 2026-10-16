@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/codecrafters-io/redis-starter-go/app/db"
@@ -26,7 +27,7 @@ func parseStringCommand(input resp.RESPValue) (Command, error) {
 func parseArrayCommand(input resp.Array) (Command, error) {
 
 	if len(input.Data) < 1 {
-		return Command{}, errors.New("Array with no data given")
+		return Command{}, errors.New("array with no data given")
 	}
 
 	var cmd string
@@ -37,7 +38,7 @@ func parseArrayCommand(input resp.Array) (Command, error) {
 	case resp.SimpleString, resp.BulkString:
 		cmd = inputCmd.String()
 	default:
-		return Command{}, fmt.Errorf("First element of a command must be either BulkString or SimpleString, got %T", inputCmd)
+		return Command{}, fmt.Errorf("first element of a command must be either BulkString or SimpleString, got %T", inputCmd)
 	}
 
 	for _, v := range input.Data[1:] {
@@ -87,7 +88,6 @@ func GenerateResponse(command Command, database *db.Database, connState *ConnSta
 		if v, err := Get(command, database); err == nil {
 			response = resp.BulkString{Data: []byte(v)}
 		} else {
-			fmt.Println(err)
 			response = resp.BulkString{}
 		}
 
@@ -110,9 +110,14 @@ func GenerateResponse(command Command, database *db.Database, connState *ConnSta
 	case "LRANGE":
 		data, err := LRange(command, database)
 		if err != nil {
-			fmt.Println(err)
+			if errors.Is(err, ErrNotFound) {
+				response = resp.NewArray([]string{})
+			} else {
+				response = resp.SimpleError{Data: err.Error()}
+			}
+		} else {
+			response = resp.NewArray(data)
 		}
-		response = resp.NewArray(data)
 	case "LLEN":
 		response = resp.Integer{Data: GetNumberOfElments(command, database)}
 	case "LPOP":
@@ -130,7 +135,6 @@ func GenerateResponse(command Command, database *db.Database, connState *ConnSta
 	case "BLPOP":
 		data, err := ListBLPop(command, database)
 		if err != nil {
-			fmt.Println(err)
 			response = resp.NewNullArray()
 		} else {
 			response = resp.NewArray(data)
@@ -161,7 +165,6 @@ func GenerateResponse(command Command, database *db.Database, connState *ConnSta
 		{
 			keys, streams, err := Xread(command, database)
 			if err != nil {
-				fmt.Println(err)
 				response = resp.SimpleError{Data: err.Error()}
 			} else {
 				streamResponses := []resp.RESPValue{}
@@ -189,7 +192,6 @@ func GenerateResponse(command Command, database *db.Database, connState *ConnSta
 		{
 			val, err := Incr(command, database)
 			if err != nil {
-				fmt.Println(err)
 				response = resp.SimpleError{Data: err.Error()}
 			} else {
 				response = resp.Integer{Data: val}
@@ -208,7 +210,6 @@ func GenerateResponse(command Command, database *db.Database, connState *ConnSta
 			} else {
 
 				err, queue := connState.Exec(database)
-				fmt.Println(queue)
 				if err != nil {
 					response = resp.SimpleError{Data: err.Error()}
 				} else {
@@ -246,9 +247,11 @@ func GenerateResponse(command Command, database *db.Database, connState *ConnSta
 		}
 
 	default:
-		response = resp.SimpleError{Data: fmt.Sprintf("Unknown command: %s", command.Name)}
-
+		response = resp.SimpleError{Data: fmt.Sprintf("uknown command: %s", command.Name)}
 	}
-	fmt.Println(response)
+
+	if errResp, ok := response.(resp.SimpleError); ok {
+		log.Println(errResp.String())
+	}
 	return
 }

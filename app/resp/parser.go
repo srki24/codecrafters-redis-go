@@ -32,7 +32,7 @@ func parseBulkString(data []byte) (BulkString, int, error) {
 func parseArray(data []byte) (Array, int, error) {
 
 	lenIdx := bytes.Index(data, []byte("\r\n"))
-	var arrData []RESPValue
+	var items []RESPValue
 	nrElements, _ := strconv.Atoi(string(data[:lenIdx]))
 
 	if nrElements == -1 {
@@ -45,11 +45,11 @@ func parseArray(data []byte) (Array, int, error) {
 		if err != nil {
 			return Array{}, 0, err
 		}
-		arrData = append(arrData, dp)
+		items = append(items, dp)
 		consumeIdx += consumed + 1
 	}
 
-	return Array{Data: arrData}, consumeIdx, nil
+	return Array{Data: items}, consumeIdx, nil
 }
 
 func Parse(data []byte) (out RESPValue, consumed int, err error) {

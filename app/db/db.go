@@ -27,19 +27,37 @@ func NewData(value DbValue, exp *int) Data {
 	}
 }
 
+func (d Data) expired() bool {
+	if d.Exp <= 0 {
+		return false
+	}
+	cTime := time.Now()
+	elapsed := int(cTime.Sub(d.CreatedTime).Milliseconds())
+	return elapsed > d.Exp
+}
+
 // Database
 type Database struct {
 	data map[string]Data
 	mu   sync.Mutex
 }
 
+func (db *Database) get(key string) (Data, bool) {
+	data, ok := db.data[key]
+
+	expired := data.expired()
+	if expired {
+		delete(db.data, key)
+	}
+	return data, ok && !expired
+}
+
 func (db *Database) Get(key string) (Data, bool) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
-
-	data, ok := db.data[key]
-	return data, ok
+	return db.get(key)
 }
+
 func NewDatabase() Database {
 	data := make(map[string]Data)
 	return Database{data: data}
@@ -60,7 +78,8 @@ func Update[T any](
 	database.mu.Lock()
 	defer database.mu.Unlock()
 
-	data, exists := database.data[key]
+	data, exists := database.get(key)
+
 	next, out, err := fn(data, exists)
 
 	if err != nil {

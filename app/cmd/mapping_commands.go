@@ -55,14 +55,6 @@ func Get(command Command, database *db.Database) (db.StringType, error) {
 
 	if v, ok := database.Get(key); ok {
 
-		cTime := time.Now()
-
-		elapsed := int(cTime.Sub(v.CreatedTime).Milliseconds())
-
-		if (v.Exp > 0) && elapsed > v.Exp {
-			return "", errors.New("Key expired")
-		}
-
 		if value, ok := v.Value.(db.StringType); ok {
 			return value, nil
 
@@ -88,6 +80,7 @@ func Incr(command Command, database *db.Database) (int, error) {
 
 		if !exists {
 			value = 1 // initializing at 0
+
 		} else {
 			dbVal := data.Value.(db.StringType)
 
