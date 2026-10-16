@@ -234,7 +234,7 @@ func GenerateResponse(command Command, database *db.Database, connState *ConnSta
 		}
 	case "WATCH":
 		{
-			if err := connState.Watch(command); err != nil {
+			if err := connState.Watch(command, database); err != nil {
 				response = resp.SimpleError{Data: err.Error()}
 			} else {
 				response = resp.SimpleString{Data: []byte("OK")}

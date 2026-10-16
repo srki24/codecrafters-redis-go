@@ -41,22 +41,21 @@ func (cs *ConnStatus) BeginTransaction() {
 }
 
 func (cs *ConnStatus) IsWatchingKeyUpdated(database *db.Database) bool {
-
 	if len(cs.watching) < 1 {
 		return false
 	}
-
-	for key, watchSetTime := range cs.watching {
-
-		if exists := database.Exists(key); !exists {
-			continue // arg doesn't exist in the database
+	for key, seen := range cs.watching {
+		data, exists := database.Get(key)
+		if !exists {
+			if seen.IsZero() {
+				continue // doesn't exist, didn't exist when watch was alled
+			} else {
+				return false
+			}
 		}
-
-		data, _ := database.Get(key)
-		if data.UpdatedTime.Compare(watchSetTime) == 1 {
+		if data.UpdatedTime.After(seen) {
 			return true // updated
 		}
-
 	}
 	return false
 }
@@ -87,21 +86,22 @@ func (cs *ConnStatus) Discard() error {
 	return nil
 }
 
-func (cs *ConnStatus) Watch(cmd Command) error {
+func (cs *ConnStatus) Watch(cmd Command, database *db.Database) error {
 	if cs.IsTransaction() {
 		return errors.New("ERR WATCH inside MULTI is not allowed")
 	}
-
 	args := cmd.Args
-
 	if len(args) < 1 {
 		return errors.New("Couldnt watch, key not provided")
 	}
-
-	watchingTime := time.Now()
 	for _, key := range args {
-		cs.watching[key] = watchingTime
+		data, exists := database.Get(key)
+		if !exists {
+			cs.watching[key] = time.Time{}
+		} else {
+			cs.watching[key] = data.UpdatedTime
 
+		}
 	}
 	return nil
 }

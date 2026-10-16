@@ -245,7 +245,6 @@ func Xread(cmd Command, database *db.Database) (keys []string, out [][]db.Stream
 		newCmd := Command{"XRANGE", xrangeArg}
 	blocking:
 		for {
-
 			// special case need only newly inserted data need to get max existing key
 			if newCmd.Args[1] == "$" {
 				streamOut, err := Xrange(newCmd, database)
