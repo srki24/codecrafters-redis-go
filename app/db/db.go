@@ -53,6 +53,14 @@ func (db *Database) get(key string) (Data, bool) {
 	return data, ok && !expired
 }
 
+func (db *Database) Exists(key string) bool {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	_, ok := db.data[key]
+	return ok
+}
+
 func (db *Database) Get(key string) (Data, bool) {
 	db.mu.Lock()
 	defer db.mu.Unlock()

@@ -69,7 +69,7 @@ func Xadd(cmd Command, database *db.Database) (string, error) {
 
 	args := cmd.Args
 
-	if len(args) < 4 {
+	if len(args) < 4 || len(args)%2 != 0 {
 		return "", errors.New("Err Failed to get add stream, not enough args")
 	}
 

@@ -10,7 +10,6 @@ import (
 )
 
 var endTransactionCommands = []string{"EXEC", "DISCARD", "WATCH"}
-var canModifyKeyCommands = []string{"SET", "INCR"}
 
 type ConnStatus struct {
 	queue       []Command
@@ -49,11 +48,11 @@ func (cs *ConnStatus) IsWatchingKeyUpdated(database *db.Database) bool {
 
 	for key, watchSetTime := range cs.watching {
 
-		data, ok := database.Get(key)
-		if !ok {
+		if exists := database.Exists(key); !exists {
 			continue // arg doesn't exist in the database
 		}
 
+		data, _ := database.Get(key)
 		if data.UpdatedTime.Compare(watchSetTime) == 1 {
 			return true // updated
 		}

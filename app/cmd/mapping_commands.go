@@ -71,7 +71,7 @@ func Incr(command Command, database *db.Database) (int, error) {
 	args := command.Args
 
 	if len(args) < 1 {
-		return 0, errors.New("Failed to INCR, not enough args")
+		return 0, errors.New("failed to INCR, not enough args")
 	}
 	key := args[0]
 
@@ -82,7 +82,11 @@ func Incr(command Command, database *db.Database) (int, error) {
 			value = 1 // initializing at 0
 
 		} else {
-			dbVal := data.Value.(db.StringType)
+			dbVal, ok := data.Value.(db.StringType)
+
+			if !ok {
+				return data, 0, fmt.Errorf("failed to INCR, wrong data type;: %T", data.Value)
+			}
 
 			nrVal, err := strconv.Atoi(string(dbVal))
 			if err != nil {
