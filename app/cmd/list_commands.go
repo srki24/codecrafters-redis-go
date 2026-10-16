@@ -101,7 +101,7 @@ func LRange(cmd Command, database *db.Database) ([]string, error) {
 			nrElements := len(val)
 
 			if fromIdx > nrElements {
-				return nil, fmt.Errorf("index out of range")
+				return nil, errors.New("index out of range")
 			}
 			if fromIdx < 0 {
 				fromIdx = max(0, nrElements+fromIdx)
@@ -113,6 +113,9 @@ func LRange(cmd Command, database *db.Database) ([]string, error) {
 				toIdx = min(toIdx+1, nrElements)
 			}
 
+			if toIdx < fromIdx {
+				return nil, errors.New("to index must be greater then from index")
+			}
 			return val[fromIdx:toIdx], nil
 		}
 		return nil, fmt.Errorf("expecte ListType value, got :%T", data.Value)

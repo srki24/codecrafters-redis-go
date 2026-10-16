@@ -27,7 +27,7 @@ func NewData(value DbValue, exp *int) Data {
 	}
 }
 
-func (d Data) expired() bool {
+func (d Data) Expired() bool {
 	if d.Exp <= 0 {
 		return false
 	}
@@ -45,7 +45,7 @@ type Database struct {
 func (db *Database) get(key string) (Data, bool) {
 	data, ok := db.data[key]
 
-	expired := data.expired()
+	expired := data.Expired()
 	if expired {
 		delete(db.data, key)
 		data = Data{}
