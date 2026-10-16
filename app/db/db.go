@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-// Data field
 type Data struct {
 	Value       DbValue
 	CreatedTime time.Time
@@ -14,29 +13,66 @@ type Data struct {
 	Exp         int
 }
 
+func NewData(value DbValue, exp *int) Data {
+	if exp == nil {
+		defaultExp := -1
+		exp = &defaultExp
+	}
+
+	now := time.Now()
+	return Data{Value: value,
+		CreatedTime: now,
+		UpdatedTime: now,
+		Exp:         *exp,
+	}
+}
+
 // Database
 type Database struct {
-	Data map[string]Data
-	Mu   sync.Mutex
+	data map[string]Data
+	mu   sync.Mutex
 }
 
 func (db *Database) Get(key string) (Data, bool) {
-	db.Mu.Lock()
-	defer db.Mu.Unlock()
+	db.mu.Lock()
+	defer db.mu.Unlock()
 
-	data, ok := db.Data[key]
+	data, ok := db.data[key]
 	return data, ok
 }
 func NewDatabase() Database {
 	data := make(map[string]Data)
-	return Database{Data: data}
+	return Database{data: data}
 }
 
 func (db *Database) Set(key string, value Data) {
-	db.Mu.Lock()
-	defer db.Mu.Unlock()
+	db.mu.Lock()
+	defer db.mu.Unlock()
 	value.UpdatedTime = time.Now()
-	db.Data[key] = value
+	db.data[key] = value
+
+}
+
+func Update[T any](
+	database *Database,
+	key string,
+	fn func(curr Data, exists bool) (next Data, out T, err error)) (out T, err error) {
+	database.mu.Lock()
+	defer database.mu.Unlock()
+
+	data, exists := database.data[key]
+	next, out, err := fn(data, exists)
+
+	if err != nil {
+		return out, err
+	}
+	now := time.Now()
+	if exists {
+		next.CreatedTime = now
+	}
+	next.UpdatedTime = now
+	database.data[key] = next
+	return out, nil
 
 }
 

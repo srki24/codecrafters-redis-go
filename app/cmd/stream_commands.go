@@ -67,9 +67,6 @@ func parseId(id string, value db.DbValue) (entryId db.EntryId, err error) {
 
 func Xadd(cmd Command, database *db.Database) (string, error) {
 
-	database.Mu.Lock()
-	defer database.Mu.Unlock()
-
 	args := cmd.Args
 
 	if len(args) < 4 {
@@ -79,52 +76,53 @@ func Xadd(cmd Command, database *db.Database) (string, error) {
 	key := args[0]
 	id := args[1]
 
-	entries := []db.EntryData{}
+	fn := func(data db.Data, exists bool) (db.Data, string, error) {
 
-	for i := 2; i < len(args); i = i + 2 {
-		entry := db.EntryData{Key: args[i], Value: args[i+1]}
-		entries = append(entries, entry)
-	}
-	data, keyExists := database.Data[key]
+		entries := []db.EntryData{}
 
-	entryId, err := parseId(id, data.Value)
-
-	if err != nil {
-		return "", err
-	}
-	// create new stream
-	if !keyExists {
-		var streamData []db.StreamData
-		streamData = append(streamData, db.StreamData{Id: entryId, Data: entries})
-
-		stream := db.Stream{
-			Data:        streamData,
-			LatestMs:    entryId.MillisecondsTime,
-			LatestSeqNr: entryId.SequenceNumber,
+		for i := 2; i < len(args); i = i + 2 {
+			entry := db.EntryData{Key: args[i], Value: args[i+1]}
+			entries = append(entries, entry)
 		}
 
-		data := db.Data{
-			Value:       stream,
-			CreatedTime: time.Now(),
-			Exp:         -1,
+		entryId, err := parseId(id, data.Value)
+
+		if err != nil {
+			return data, "", err
+		}
+		// create new stream
+		if !exists {
+			var streamData []db.StreamData
+			streamData = append(streamData, db.StreamData{Id: entryId, Data: entries})
+
+			stream := db.Stream{
+				Data:        streamData,
+				LatestMs:    entryId.MillisecondsTime,
+				LatestSeqNr: entryId.SequenceNumber,
+			}
+
+			data := db.Data{
+				Value:       stream,
+				CreatedTime: time.Now(),
+				Exp:         -1,
+			}
+			return data, entryId.String(), nil
 		}
 
-		database.Data[key] = data
-		return entryId.String(), nil
+		// Existing stream
+		stream := data.Value.(db.Stream)
 
+		stream.LatestMs = entryId.MillisecondsTime
+		stream.LatestSeqNr = entryId.SequenceNumber
+		stream.Data = append(stream.Data, db.StreamData{Id: entryId, Data: entries})
+
+		data.Value = stream
+
+		return data, entryId.String(), nil
 	}
 
-	// Existing stream
-	stream := data.Value.(db.Stream)
-
-	stream.LatestMs = entryId.MillisecondsTime
-	stream.LatestSeqNr = entryId.SequenceNumber
-	stream.Data = append(stream.Data, db.StreamData{Id: entryId, Data: entries})
-
-	data.Value = stream
-	database.Data[key] = data
-
-	return entryId.String(), nil
+	out, err := db.Update(database, key, fn)
+	return out, err
 }
 
 func parseKey(key string, isStart bool) string {
@@ -270,6 +268,7 @@ func Xread(cmd Command, database *db.Database) (keys []string, out [][]db.Stream
 			if len(streamOut) == 0 && timeout != -1 {
 				end := time.Now()
 				if (timeout == 0) || int(end.Sub(start).Milliseconds()) < timeout {
+					time.Sleep(500 * time.Millisecond)
 					continue blocking
 				}
 			}

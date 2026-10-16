@@ -76,9 +76,6 @@ func Get(command Command, database *db.Database) (db.StringType, error) {
 }
 
 func Incr(command Command, database *db.Database) (int, error) {
-	database.Mu.Lock()
-	defer database.Mu.Unlock()
-	var value int
 	args := command.Args
 
 	if len(args) < 1 {
@@ -86,23 +83,30 @@ func Incr(command Command, database *db.Database) (int, error) {
 	}
 	key := args[0]
 
-	data, hasKey := database.Data[key]
+	upd := func(data db.Data, exists bool) (db.Data, int, error) {
+		var value int
 
-	if !hasKey {
-		value = 1 // initializing at 0
-	} else {
-		dbVal := data.Value.(db.StringType)
+		if !exists {
+			value = 1 // initializing at 0
+		} else {
+			dbVal := data.Value.(db.StringType)
 
-		nrVal, err := strconv.Atoi(string(dbVal))
-		if err != nil {
-			return 0, errors.New("ERR value is not an integer or out of range")
+			nrVal, err := strconv.Atoi(string(dbVal))
+			if err != nil {
+				return data, 0, errors.New("ERR value is not an integer or out of range")
+			}
+
+			value = nrVal + 1
 		}
 
-		value = nrVal + 1
+		data.Value = db.StringType(strconv.Itoa(value))
+		return data, value, nil
 	}
 
-	data.Value = db.StringType(strconv.Itoa(value))
-	database.Data[key] = data
-	return int(value), nil
+	out, err := db.Update(database, key, upd)
+	if err != nil {
+		return 0, err
+	}
+	return out, nil
 
 }

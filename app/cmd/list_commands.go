@@ -13,8 +13,6 @@ import (
 var ErrNotFound = errors.New("not found")
 
 func ListPush(cmd Command, database *db.Database, right bool) (int, error) {
-	database.Mu.Lock()
-	defer database.Mu.Unlock()
 
 	args := cmd.Args
 	if len(args) < 2 {
@@ -22,29 +20,45 @@ func ListPush(cmd Command, database *db.Database, right bool) (int, error) {
 	}
 
 	key := args[0]
-	values := make([]string, len(args[1:]))
-	copy(values, args[1:])
 
-	if !right {
-		slices.Reverse(values)
-	}
+	upd := func(data db.Data, exists bool) (db.Data, int, error) {
+		values := make([]string, len(args[1:]))
+		copy(values, args[1:])
 
-	if data, ok := database.Data[key]; ok {
-		if val, ok := data.Value.(db.ListType); ok {
-
-			if right {
-				values = append(val, values...)
-			} else {
-				values = append(values, val...)
-			}
-		} else {
-			return 0, fmt.Errorf("Expecte ListType value, got :%T", data.Value)
-
+		if !exists {
+			def := db.NewData(db.ListType(values), nil)
+			return def, len(values), nil
 		}
-	}
-	database.Data[key] = db.Data{Value: db.ListType(values), CreatedTime: time.Now(), Exp: -1}
 
-	return len(values), nil
+		if !right {
+			slices.Reverse(values)
+		}
+
+		val, ok := data.Value.(db.ListType)
+
+		if !ok {
+			return db.Data{}, 0, fmt.Errorf("Expecte ListType value, got :%T", data.Value)
+		}
+
+		if right {
+			values = append(val, values...)
+		} else {
+			values = append(values, val...)
+		}
+
+		return db.Data{Value: db.ListType(values), CreatedTime: time.Now(), Exp: -1}, len(values), nil
+	}
+
+	out, err := db.Update(
+		database,
+		key,
+		upd)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return out, nil
 }
 
 func GetNumberOfElments(cmd Command, database *db.Database) int {
@@ -110,9 +124,6 @@ func LRange(cmd Command, database *db.Database) ([]string, error) {
 
 func ListPop(cmd Command, database *db.Database) ([]string, error) {
 
-	database.Mu.Lock()
-	defer database.Mu.Unlock()
-
 	args := cmd.Args
 	if len(args) < 1 {
 		return nil, errors.New("Failed to get pop element, not enough args")
@@ -128,20 +139,35 @@ func ListPop(cmd Command, database *db.Database) ([]string, error) {
 		}
 		toPop = newPop
 	}
-	if data, ok := database.Data[key]; ok {
-		if val, ok := data.Value.(db.ListType); ok {
-			if len(val) == 0 {
-				return nil, ErrNotFound
-			}
-			toPop = min(toPop, len(val))
-			data.Value = val[toPop:]
-			database.Data[key] = data
 
-			return val[:toPop], nil
+	upd := func(data db.Data, exists bool) (db.Data, []string, error) {
+
+		if !exists {
+			return db.Data{}, nil, ErrNotFound
 		}
-		return nil, fmt.Errorf("Expecte ListType value, got :%T", data.Value)
+		val, ok := data.Value.(db.ListType)
+		if !ok {
+			return db.Data{}, nil, fmt.Errorf("Expecte ListType value, got :%T", data.Value)
+		}
+
+		if len(val) == 0 {
+			return db.Data{}, nil, ErrNotFound
+		}
+		n := min(toPop, len(val))
+
+		data.Value = val[n:]
+		data.UpdatedTime = time.Now()
+
+		return data, val[:n], nil
 	}
-	return nil, ErrNotFound
+
+	out, err := db.Update(database, key, upd)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
 
 }
 
@@ -171,6 +197,7 @@ func ListBLPop(cmd Command, database *db.Database) ([]string, error) {
 			if (timeout != 0) && end.Sub(start).Seconds() > timeout {
 				return nil, errors.New("No data, timed out")
 			}
+			time.Sleep(500 * time.Microsecond)
 			continue
 		}
 
