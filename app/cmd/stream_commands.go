@@ -214,57 +214,15 @@ func Xread(cmd Command, database *db.Database) (keys []string, out [][]db.Stream
 		err = errors.New("Err XREAD Failed to get stream, not enough args")
 		return
 	}
-	timeout := -1
-	xrangeArgs := [][]string{}
-	for i := 0; i < len(args); {
-		arg := strings.ToUpper(args[i])
-		switch arg {
-		case "BLOCK":
-			timeout, err = strconv.Atoi(args[i+1])
-			if err != nil {
-				return
-			}
-			i = i + 2
-		case "STREAM":
-			streamKey := args[i+1]
-			fromId, toId := xreadParseId(args[i+2])
-			xrangeArgs = append(xrangeArgs, []string{streamKey, fromId, toId})
-			i = i + 3
-		case "STREAMS":
-			i++
-			halfArgs := (len(args) - i) / 2
-			for j := i; j < i+halfArgs; j++ {
-				streamKey := args[j]
-				fromId, toId := xreadParseId(args[j+halfArgs])
-				xrangeArgs = append(xrangeArgs, []string{streamKey, fromId, toId})
-			}
-			i = len(args)
-		default:
-			err = fmt.Errorf("Unknown argument: %s", arg)
-			return
-		}
 
-	}
 	start := time.Now()
-
-	var commands []Command
-	for _, xrangeArg := range xrangeArgs {
-		newCmd := Command{"XRANGE", xrangeArg}
-		// special case need only newly inserted data need to get max existing key
-		if newCmd.Args[1] == "$" {
-			newCmd.Args[1] = "-" // read the whole stream in orer to get keys
-			streamOut, err := Xrange(newCmd, database)
-			if err != nil {
-				return keys, out, err
-			}
-			if len(streamOut) == 0 {
-				newCmd.Args[1] = "0"
-			} else {
-				maxId := streamOut[len(streamOut)-1].Id
-				newCmd.Args[1] = fmt.Sprintf("%d-%d", maxId.MillisecondsTime, maxId.SequenceNumber+1)
-			}
-		}
-		commands = append(commands, newCmd)
+	xrangeArgs, timeout, err := xreadParseArgs(args)
+	if err != nil {
+		return keys, out, err
+	}
+	commands, err := xReadParseCommands(xrangeArgs, database)
+	if err != nil {
+		return keys, out, err
 	}
 
 	for {
@@ -292,4 +250,61 @@ func Xread(cmd Command, database *db.Database) (keys []string, out [][]db.Stream
 	}
 
 	return keys, out, err
+}
+
+func xreadParseArgs(args []string) (xrangeArgs [][]string, timeout int, err error) {
+	timeout = -1
+	for i := 0; i < len(args); {
+		arg := strings.ToUpper(args[i])
+		switch arg {
+		case "BLOCK":
+			timeout, err = strconv.Atoi(args[i+1])
+			if err != nil {
+				return xrangeArgs, timeout, err
+			}
+			i = i + 2
+		case "STREAM":
+			streamKey := args[i+1]
+			fromId, toId := xreadParseId(args[i+2])
+			xrangeArgs = append(xrangeArgs, []string{streamKey, fromId, toId})
+			i = i + 3
+		case "STREAMS":
+			i++
+			halfArgs := (len(args) - i) / 2
+			for j := i; j < i+halfArgs; j++ {
+				streamKey := args[j]
+				fromId, toId := xreadParseId(args[j+halfArgs])
+				xrangeArgs = append(xrangeArgs, []string{streamKey, fromId, toId})
+			}
+			i = len(args)
+		default:
+			err = fmt.Errorf("Unknown argument: %s", arg)
+			return xrangeArgs, timeout, err
+		}
+
+	}
+	return xrangeArgs, timeout, err
+}
+
+func xReadParseCommands(xrangeArgs [][]string, database *db.Database) (commands []Command, err error) {
+
+	for _, xrangeArg := range xrangeArgs {
+		newCmd := Command{"XRANGE", xrangeArg}
+		// special case need only newly inserted data need to get max existing key
+		if newCmd.Args[1] == "$" {
+			newCmd.Args[1] = "-" // read the whole stream in orer to get keys
+			streamOut, err := Xrange(newCmd, database)
+			if err != nil {
+				return commands, err
+			}
+			if len(streamOut) == 0 {
+				newCmd.Args[1] = "0"
+			} else {
+				maxId := streamOut[len(streamOut)-1].Id
+				newCmd.Args[1] = fmt.Sprintf("%d-%d", maxId.MillisecondsTime, maxId.SequenceNumber+1)
+			}
+		}
+		commands = append(commands, newCmd)
+	}
+	return commands, nil
 }
