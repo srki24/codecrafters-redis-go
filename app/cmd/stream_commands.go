@@ -291,8 +291,9 @@ func xReadParseCommands(xrangeArgs [][]string, database *db.Database) (commands 
 			if err != nil {
 				if errors.Is(err, ErrNotFound) { // Non existing key
 					newCmd.Args[1] = "0"
+				} else {
+					return commands, err
 				}
-				return commands, err
 			} else if len(streamOut) == 0 {
 				newCmd.Args[1] = "0"
 			} else {
