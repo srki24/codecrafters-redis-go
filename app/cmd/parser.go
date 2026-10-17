@@ -158,7 +158,11 @@ func GenerateResponse(command Command, database *db.Database, connState *ConnSta
 		{
 			keys, streams, err := Xread(command, database)
 			if err != nil {
-				response = resp.SimpleError{Data: err.Error()}
+				if errors.Is(err, ErrNotFound) {
+					response = resp.NewArray([]string{})
+				} else {
+					response = resp.SimpleError{Data: err.Error()}
+				}
 			} else {
 				streamResponses := []resp.RESPValue{}
 				for i := 0; i < len(keys); i++ {
