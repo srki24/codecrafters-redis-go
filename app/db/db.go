@@ -126,6 +126,24 @@ func (id EntryId) String() string {
 	return fmt.Sprintf("%d-%d", id.MillisecondsTime, id.SequenceNumber)
 }
 
+func (self EntryId) Greater(other EntryId) bool {
+	if self.MillisecondsTime > other.MillisecondsTime {
+		return true
+	}
+	if self.MillisecondsTime == other.MillisecondsTime {
+		return self.SequenceNumber > other.SequenceNumber
+	}
+	return false
+}
+
+func (self EntryId) Equal(other EntryId) bool {
+	return self.MillisecondsTime == other.MillisecondsTime && self.SequenceNumber == other.SequenceNumber
+}
+
+func (self EntryId) Less(other EntryId) bool {
+	return !self.Greater(other) && !self.Equal(other)
+}
+
 type EntryData struct {
 	Key   string
 	Value string

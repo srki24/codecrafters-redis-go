@@ -10,7 +10,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/db"
 )
 
-const maxDateMillis = "253402300799000"
+const maxDateMillis = 253402300799000
 const maxSeq = int(^uint(0) >> 1)
 
 func parseParts(id string, streamMs int, streamSeq int) (msTime, seqNr int, err error) {
@@ -125,34 +125,36 @@ func Xadd(cmd Command, database *db.Database) (string, error) {
 	return out, err
 }
 
-func parseKey(key string, isStart bool) string {
+func parseKey(key string, isStart bool) (db.EntryId, error) {
 	var msTimeStr, seqNrStr string
-	parts := strings.Split(key, "-")
-	if len(parts) == 2 {
+	if key == "-" && isStart {
+		msTimeStr = "0"
+		seqNrStr = "0"
+	} else if key == "+" && !isStart {
+		msTimeStr = strconv.Itoa(maxDateMillis)
+		seqNrStr = strconv.Itoa(maxSeq)
+	} else if strings.Contains(key, "-") && len(key) >= 3 { // ms-seq format
+		parts := strings.Split(key, "-")
 		msTimeStr = parts[0]
 		seqNrStr = parts[1]
-	} else {
-
-		if key == "-" && isStart {
-			msTimeStr = "0"
+	} else { // just key provided
+		msTimeStr = key
+		if isStart {
 			seqNrStr = "0"
-		} else if key == "+" && !isStart {
-			msTimeStr = maxDateMillis
-		} else { // just key provided
-			msTimeStr = key
-
-			if isStart {
-				seqNrStr = "0"
-			} else {
-				seqNrStr = strconv.Itoa(maxSeq)
-			}
-
+		} else {
+			seqNrStr = strconv.Itoa(maxSeq)
 		}
-
 	}
 
-	return fmt.Sprintf("%s-%s", msTimeStr, seqNrStr)
-
+	msTime, err := strconv.Atoi(msTimeStr)
+	if err != nil {
+		return db.EntryId{}, err
+	}
+	seqNr, err := strconv.Atoi(seqNrStr)
+	if err != nil {
+		return db.EntryId{}, err
+	}
+	return db.EntryId{MillisecondsTime: msTime, SequenceNumber: seqNr}, nil
 }
 
 func Xrange(cmd Command, database *db.Database) (out []db.StreamData, err error) {
@@ -164,9 +166,14 @@ func Xrange(cmd Command, database *db.Database) (out []db.StreamData, err error)
 	}
 
 	key := args[0]
-	fromId := parseKey(args[1], true)
-	toId := parseKey(args[2], false)
-
+	fromId, err := parseKey(args[1], true)
+	if err != nil {
+		return out, err
+	}
+	toId, err := parseKey(args[2], false)
+	if err != nil {
+		return out, err
+	}
 	data, keyExists := database.Get(key)
 	if !keyExists {
 		err = errors.New("Err key doesn't exist")
@@ -180,7 +187,9 @@ func Xrange(cmd Command, database *db.Database) (out []db.StreamData, err error)
 	}
 
 	for _, streamData := range stream.Data {
-		if streamData.Id.String() >= fromId && streamData.Id.String() <= toId {
+		greaterOrEqualFromId := streamData.Id.Greater(fromId) || streamData.Id.Equal(fromId)
+		lessOrEqualToId := streamData.Id.Less(toId) || streamData.Id.Equal(toId)
+		if greaterOrEqualFromId && lessOrEqualToId {
 			out = append(out, streamData)
 		}
 	}
@@ -201,16 +210,13 @@ func xreadParseId(key string) (string, string) {
 }
 func Xread(cmd Command, database *db.Database) (keys []string, out [][]db.StreamData, err error) {
 	args := cmd.Args
-
 	if len(args) < 3 {
 		err = errors.New("Err XREAD Failed to get stream, not enough args")
 		return
 	}
-
 	timeout := -1
 	xrangeArgs := [][]string{}
 	for i := 0; i < len(args); {
-
 		arg := strings.ToUpper(args[i])
 		switch arg {
 		case "BLOCK":
@@ -241,44 +247,49 @@ func Xread(cmd Command, database *db.Database) (keys []string, out [][]db.Stream
 	}
 	start := time.Now()
 
+	var commands []Command
 	for _, xrangeArg := range xrangeArgs {
 		newCmd := Command{"XRANGE", xrangeArg}
-	blocking:
-		for {
-			// special case need only newly inserted data need to get max existing key
-			if newCmd.Args[1] == "$" {
-				streamOut, err := Xrange(newCmd, database)
-				if err != nil {
-					return keys, out, err
-				}
-				if len(streamOut) == 0 {
-					newCmd.Args[1] = "0"
-				} else {
-					maxId := streamOut[len(streamOut)-1].Id
-					newCmd.Args[1] = fmt.Sprintf("%d-%d", maxId.MillisecondsTime, maxId.SequenceNumber+1)
-				}
-
+		// special case need only newly inserted data need to get max existing key
+		if newCmd.Args[1] == "$" {
+			newCmd.Args[1] = "-" // read the whole stream in orer to get keys
+			streamOut, err := Xrange(newCmd, database)
+			if err != nil {
+				return keys, out, err
 			}
+			if len(streamOut) == 0 {
+				newCmd.Args[1] = "0"
+			} else {
+				maxId := streamOut[len(streamOut)-1].Id
+				newCmd.Args[1] = fmt.Sprintf("%d-%d", maxId.MillisecondsTime, maxId.SequenceNumber+1)
+			}
+		}
+		commands = append(commands, newCmd)
+	}
+
+	for {
+		progessed := false
+		for _, newCmd := range commands {
 			streamOut, err := Xrange(newCmd, database)
 			if err != nil {
 				return keys, out, err
 			}
 
-			if len(streamOut) == 0 && timeout != -1 {
-				end := time.Now()
-				if (timeout == 0) || int(end.Sub(start).Milliseconds()) < timeout {
-					time.Sleep(500 * time.Millisecond)
-					continue blocking
-				}
+			if len(streamOut) > 0 {
+				out = append(out, streamOut)
+				keys = append(keys, newCmd.Args[0])
+				progessed = true
 			}
-			out = append(out, streamOut)
-			keys = append(keys, xrangeArg[0])
-			break blocking
 		}
 
+		end := time.Now()
+		timedOut := timeout > 0 && int(end.Sub(start).Milliseconds()) > timeout
+
+		if progessed || timeout < 0 || timedOut {
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
 	}
-	if len(out) != len(keys) {
-		err = errors.New("Err XREAD, number of keys and outputs missmatch")
-	}
+
 	return keys, out, err
 }
