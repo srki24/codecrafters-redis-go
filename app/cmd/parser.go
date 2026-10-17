@@ -61,12 +61,10 @@ func ParseCommand(input resp.RESPValue) (Command, error) {
 }
 
 func GenerateResponse(command Command, database *db.Database, connState *ConnStatus) (response resp.RESPValue) {
-
 	if ok := connState.QueueCommand(command); ok {
 		response = resp.SimpleString{Data: []byte("QUEUED")}
 		return
 	}
-
 	switch strings.ToUpper(command.Name) {
 	case "ECHO":
 		if len(command.Args) < 1 {
@@ -83,14 +81,12 @@ func GenerateResponse(command Command, database *db.Database, connState *ConnSta
 		} else {
 			response = resp.SimpleString{Data: []byte("OK")}
 		}
-
 	case "GET":
 		if v, err := Get(command, database); err == nil {
 			response = resp.BulkString{Data: []byte(v)}
 		} else {
 			response = resp.BulkString{}
 		}
-
 	case "RPUSH":
 		n, err := ListPush(command, database, true)
 		if err != nil {
@@ -98,7 +94,6 @@ func GenerateResponse(command Command, database *db.Database, connState *ConnSta
 		} else {
 			response = resp.Integer{Data: n}
 		}
-
 	case "LPUSH":
 		n, err := ListPush(command, database, false)
 		if err != nil {
@@ -106,7 +101,6 @@ func GenerateResponse(command Command, database *db.Database, connState *ConnSta
 		} else {
 			response = resp.Integer{Data: n}
 		}
-
 	case "LRANGE":
 		data, err := LRange(command, database)
 		if err != nil {
@@ -160,7 +154,6 @@ func GenerateResponse(command Command, database *db.Database, connState *ConnSta
 		} else {
 			response = resp.NewArrayFromStream(data)
 		}
-
 	case "XREAD":
 		{
 			keys, streams, err := Xread(command, database)
@@ -173,10 +166,6 @@ func GenerateResponse(command Command, database *db.Database, connState *ConnSta
 					stream := streams[i]
 					streamKey := resp.BulkString{Data: []byte(key)}
 					streamValue := resp.NewArrayFromStream(stream)
-
-					if streamValue.IsNull {
-						continue
-					}
 					streamResponses = append(
 						streamResponses,
 						resp.Array{Data: []resp.RESPValue{streamKey, streamValue}})

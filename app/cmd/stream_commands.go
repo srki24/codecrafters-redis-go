@@ -213,7 +213,6 @@ func Xread(cmd Command, database *db.Database) (keys []string, out [][]db.Stream
 		err = errors.New("Err XREAD Failed to get stream, not enough args")
 		return
 	}
-
 	start := time.Now()
 	xrangeArgs, timeout, err := xreadParseArgs(args)
 	if err != nil {
@@ -223,7 +222,6 @@ func Xread(cmd Command, database *db.Database) (keys []string, out [][]db.Stream
 	if err != nil {
 		return keys, out, err
 	}
-
 	for {
 		progessed := false
 		for _, newCmd := range commands {
@@ -238,10 +236,8 @@ func Xread(cmd Command, database *db.Database) (keys []string, out [][]db.Stream
 				progessed = true
 			}
 		}
-
 		end := time.Now()
 		timedOut := timeout > 0 && int(end.Sub(start).Milliseconds()) > timeout
-
 		if progessed || timeout < 0 || timedOut {
 			break
 		}
@@ -295,16 +291,14 @@ func xReadParseCommands(xrangeArgs [][]string, database *db.Database) (commands 
 			if err != nil {
 				if errors.Is(err, ErrNotFound) { // Non existing key
 					newCmd.Args[1] = "0"
-					continue
 				}
 				return commands, err
-			}
-			if len(streamOut) == 0 {
+			} else if len(streamOut) == 0 {
 				newCmd.Args[1] = "0"
-				continue
+			} else {
+				maxId := streamOut[len(streamOut)-1].Id
+				newCmd.Args[1] = fmt.Sprintf("%d-%d", maxId.MillisecondsTime, maxId.SequenceNumber+1)
 			}
-			maxId := streamOut[len(streamOut)-1].Id
-			newCmd.Args[1] = fmt.Sprintf("%d-%d", maxId.MillisecondsTime, maxId.SequenceNumber+1)
 		}
 		commands = append(commands, newCmd)
 	}

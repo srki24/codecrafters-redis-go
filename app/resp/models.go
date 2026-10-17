@@ -106,9 +106,6 @@ func NewArrayFromStream(data []db.StreamData) Array {
 
 		entries = append(entries, entry)
 	}
-	if len(entries) == 0 {
-		return NewNullArray()
-	}
 	return Array{Data: entries}
 }
 
