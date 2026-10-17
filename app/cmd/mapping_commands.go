@@ -11,7 +11,6 @@ import (
 )
 
 func Set(command Command, database *db.Database) error {
-
 	args := command.Args
 	exp := -1
 
@@ -40,54 +39,42 @@ func Set(command Command, database *db.Database) error {
 		}
 	}
 	database.Set(key, db.Data{Value: value, CreatedTime: time.Now(), Exp: exp})
-
 	return nil
-
 }
 
 func Get(command Command, database *db.Database) (db.StringType, error) {
 	args := command.Args
 	if len(args) < 1 {
-		return "", errors.New("Failed to get mapping, not enough args")
+		return "", errors.New("failed to get mapping, not enough args")
 	}
-
 	key := args[0]
-
 	if v, ok := database.Get(key); ok {
-
 		if value, ok := v.Value.(db.StringType); ok {
 			return value, nil
 
 		} else {
-			return "", fmt.Errorf("Expecte StringType value, got :%T", v.Value)
+			return "", fmt.Errorf("expecte StringType value, got :%T", v.Value)
 		}
-
 	} else {
-		return "", errors.New("Missing key")
+		return "", ErrNotFound
 	}
 }
 
 func Incr(command Command, database *db.Database) (int, error) {
 	args := command.Args
-
 	if len(args) < 1 {
 		return 0, errors.New("failed to INCR, not enough args")
 	}
 	key := args[0]
-
 	upd := func(data db.Data, exists bool) (db.Data, int, error) {
 		var value int
-
 		if !exists {
 			value = 1 // initializing at 0
-
 		} else {
 			dbVal, ok := data.Value.(db.StringType)
-
 			if !ok {
 				return data, 0, fmt.Errorf("failed to INCR, wrong data type;: %T", data.Value)
 			}
-
 			nrVal, err := strconv.Atoi(string(dbVal))
 			if err != nil {
 				return data, 0, errors.New("ERR value is not an integer or out of range")
@@ -95,7 +82,6 @@ func Incr(command Command, database *db.Database) (int, error) {
 
 			value = nrVal + 1
 		}
-
 		data.Value = db.StringType(strconv.Itoa(value))
 		return data, value, nil
 	}

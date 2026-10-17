@@ -10,8 +10,6 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/db"
 )
 
-var ErrNotFound = errors.New("not found")
-
 func ListPush(cmd Command, database *db.Database, right bool) (int, error) {
 	args := cmd.Args
 	if len(args) < 2 {

@@ -176,8 +176,7 @@ func Xrange(cmd Command, database *db.Database) (out []db.StreamData, err error)
 	}
 	data, keyExists := database.Get(key)
 	if !keyExists {
-		err = errors.New("Err key doesn't exist")
-		return out, err
+		return out, ErrNotFound
 	}
 
 	stream, isStream := data.Value.(db.Stream)
@@ -287,7 +286,6 @@ func xreadParseArgs(args []string) (xrangeArgs [][]string, timeout int, err erro
 }
 
 func xReadParseCommands(xrangeArgs [][]string, database *db.Database) (commands []Command, err error) {
-
 	for _, xrangeArg := range xrangeArgs {
 		newCmd := Command{"XRANGE", xrangeArg}
 		// special case need only newly inserted data need to get max existing key
@@ -295,14 +293,18 @@ func xReadParseCommands(xrangeArgs [][]string, database *db.Database) (commands 
 			newCmd.Args[1] = "-" // read the whole stream in orer to get keys
 			streamOut, err := Xrange(newCmd, database)
 			if err != nil {
+				if errors.Is(err, ErrNotFound) { // Non existing key
+					newCmd.Args[1] = "0"
+					continue
+				}
 				return commands, err
 			}
 			if len(streamOut) == 0 {
 				newCmd.Args[1] = "0"
-			} else {
-				maxId := streamOut[len(streamOut)-1].Id
-				newCmd.Args[1] = fmt.Sprintf("%d-%d", maxId.MillisecondsTime, maxId.SequenceNumber+1)
+				continue
 			}
+			maxId := streamOut[len(streamOut)-1].Id
+			newCmd.Args[1] = fmt.Sprintf("%d-%d", maxId.MillisecondsTime, maxId.SequenceNumber+1)
 		}
 		commands = append(commands, newCmd)
 	}
