@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -11,21 +10,12 @@ import (
 	"os"
 
 	"github.com/codecrafters-io/redis-starter-go/app/cmd"
+	"github.com/codecrafters-io/redis-starter-go/app/config"
 	"github.com/codecrafters-io/redis-starter-go/app/db"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
-type Config struct {
-	Port        int
-	Replication bool
-}
-
-var AppConfig Config
-
-func parseArgs() {
-	flag.IntVar(&AppConfig.Port, "port", 6379, "Port to start the server on")
-	flag.Parse()
-}
+var AppConfig config.Config
 
 func handleConn(connetion net.Conn, db *db.Database) {
 	defer connetion.Close()
@@ -73,15 +63,16 @@ func handleConn(connetion net.Conn, db *db.Database) {
 }
 
 func main() {
-	parseArgs()
+	config.ParseInto(&AppConfig)
 	l, err := net.Listen(
 		"tcp", fmt.Sprintf("0.0.0.0:%d", AppConfig.Port))
+
 	if err != nil {
 		log.Println("Failed to bind to port 6379")
 		os.Exit(1)
 	}
 
-	db := db.NewDatabase()
+	db := db.NewDatabase(&AppConfig)
 	for {
 
 		conn, err := l.Accept()

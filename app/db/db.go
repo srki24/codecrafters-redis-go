@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/codecrafters-io/redis-starter-go/app/config"
 )
 
 type Data struct {
@@ -38,8 +40,9 @@ func (d Data) Expired() bool {
 
 // Database
 type Database struct {
-	data map[string]Data
-	mu   sync.Mutex
+	data    map[string]Data
+	mu      sync.Mutex
+	replica Replica
 }
 
 func (db *Database) get(key string) (Data, bool) {
@@ -59,17 +62,22 @@ func (db *Database) Get(key string) (Data, bool) {
 	return db.get(key)
 }
 
-func NewDatabase() Database {
-	data := make(map[string]Data)
-	return Database{data: data}
-}
-
 func (db *Database) Set(key string, value Data) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	value.UpdatedTime = time.Now()
 	db.data[key] = value
 
+}
+
+func (db *Database) GetReplica() Replica {
+	return db.replica
+}
+
+func NewDatabase(config *config.Config) Database {
+	data := make(map[string]Data)
+	replica := newReplica(config)
+	return Database{data: data, replica: replica}
 }
 
 func Update[T any](
@@ -116,7 +124,6 @@ func (lt ListType) GetType() string {
 }
 
 // Stream type
-
 type EntryId struct {
 	MillisecondsTime int
 	SequenceNumber   int
@@ -162,4 +169,27 @@ type Stream struct {
 
 func (st Stream) GetType() string {
 	return "stream"
+}
+
+// Intern Replica type
+type Replica struct {
+	role             string
+	masterReplid     string
+	masterReplOffset int
+}
+
+func newReplica(config *config.Config) Replica {
+	var role string
+	replicaOf := config.ReplicaOf
+	if replicaOf == "" {
+		role = "master"
+	} else {
+		role = "slave"
+	}
+
+	return Replica{role: role}
+}
+
+func (r Replica) String() string {
+	return fmt.Sprintf("role:%s", r.role)
 }

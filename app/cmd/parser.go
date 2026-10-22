@@ -60,7 +60,10 @@ func ParseCommand(input resp.RESPValue) (Command, error) {
 	}
 }
 
-func GenerateResponse(command Command, database *db.Database, connState *ConnStatus) (response resp.RESPValue) {
+func GenerateResponse(
+	command Command,
+	database *db.Database,
+	connState *ConnStatus) (response resp.RESPValue) {
 	if ok := connState.QueueCommand(command); ok {
 		response = resp.SimpleString{Data: []byte("QUEUED")}
 		return
@@ -240,7 +243,7 @@ func GenerateResponse(command Command, database *db.Database, connState *ConnSta
 		}
 	case "INFO":
 		{
-			data := Info(command)
+			data := Info(command, database)
 			response = resp.BulkString{Data: []byte(data)}
 		}
 
