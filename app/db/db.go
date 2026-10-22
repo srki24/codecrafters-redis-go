@@ -170,26 +170,3 @@ type Stream struct {
 func (st Stream) GetType() string {
 	return "stream"
 }
-
-// Intern Replica type
-type Replica struct {
-	role             string
-	masterReplid     string
-	masterReplOffset int
-}
-
-func newReplica(config *config.Config) Replica {
-	var role string
-	replicaOf := config.ReplicaOf
-	if replicaOf == "" {
-		role = "master"
-	} else {
-		role = "slave"
-	}
-
-	return Replica{role: role}
-}
-
-func (r Replica) String() string {
-	return fmt.Sprintf("role:%s", r.role)
-}
