@@ -238,6 +238,11 @@ func GenerateResponse(command Command, database *db.Database, connState *ConnSta
 			connState.Unwatch()
 			response = resp.SimpleString{Data: []byte("OK")}
 		}
+	case "INFO":
+		{
+			data := Info(command)
+			response = resp.BulkString{Data: []byte(data)}
+		}
 
 	default:
 		response = resp.SimpleError{Data: fmt.Sprintf("uknown command: %s", command.Name)}

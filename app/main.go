@@ -16,7 +16,8 @@ import (
 )
 
 type Config struct {
-	Port int
+	Port        int
+	Replication bool
 }
 
 var AppConfig Config
