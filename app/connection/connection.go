@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"strconv"
 
 	"github.com/codecrafters-io/redis-starter-go/app/cmd"
 	"github.com/codecrafters-io/redis-starter-go/app/config"
@@ -73,10 +74,36 @@ func Handshake(appConfig *config.Config) error {
 	if err != nil {
 		return err
 	}
-	d, err := net.Dial("tcp", fmt.Sprintf("%s:%s", host, port))
+	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", host, port))
+	defer conn.Close()
 	if err != nil {
 		return err
 	}
-	_, err = d.Write(resp.NewArray([]string{"PING"}).Serialize())
-	return err
+
+	messages := [][]string{
+		{"PING"},
+		{"REPLCONF", "listening-port", strconv.Itoa(appConfig.Port)},
+		{"REPLCONF", "capa", "psync"},
+		{"PSYNC", "?", "-1"},
+	}
+
+	buf := make([]byte, 2048)
+	for _, msg := range messages {
+		fmt.Println(msg)
+		respMsg := resp.NewArray(msg)
+		_, err = conn.Write(respMsg.Serialize())
+
+		if err != nil {
+			return err
+		}
+
+		// waiting for response
+		n, err := conn.Read(buf)
+		if err != nil {
+			return err
+		}
+		fmt.Println(buf[:n])
+	}
+
+	return nil
 }
