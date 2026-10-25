@@ -250,8 +250,8 @@ func GenerateResponse(
 		response = resp.SimpleString{Data: []byte("OK")}
 	case "PSYNC":
 		{
-			data := []string{"FULLRESYNC", database.GetReplica().Id(), "0"}
-			response = resp.NewArray(data)
+			data := fmt.Sprintf("FULLRESYNC %s 0", database.GetReplica().Id())
+			response = resp.SimpleString{Data: []byte(data)}
 		}
 
 	default:
