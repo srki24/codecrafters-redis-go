@@ -246,6 +246,13 @@ func GenerateResponse(
 			data := Info(command, database)
 			response = resp.BulkString{Data: []byte(data)}
 		}
+	case "REPLCONF":
+		response = resp.SimpleString{Data: []byte("OK")}
+	case "PSYNC":
+		{
+			data := []string{"FULLRESYNC", database.GetReplica().Id(), "0"}
+			response = resp.NewArray(data)
+		}
 
 	default:
 		response = resp.SimpleError{Data: fmt.Sprintf("uknown command: %s", command.Name)}

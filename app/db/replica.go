@@ -42,6 +42,10 @@ func newReplica(config *config.Config) Replica {
 	}
 }
 
+func (r Replica) Id() string {
+	return r.masterReplid
+}
+
 func (r Replica) String() string {
 	var out strings.Builder
 
