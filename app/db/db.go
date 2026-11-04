@@ -41,7 +41,7 @@ func (d Data) Expired() bool {
 // Database
 type Database struct {
 	data    map[string]Data
-	mu      sync.Mutex
+	mu      sync.RWMutex
 	replica Replica
 }
 
@@ -57,8 +57,8 @@ func (db *Database) get(key string) (Data, bool) {
 }
 
 func (db *Database) Get(key string) (Data, bool) {
-	db.mu.Lock()
-	defer db.mu.Unlock()
+	db.mu.RLock()
+	defer db.mu.RUnlock()
 	return db.get(key)
 }
 
