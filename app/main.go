@@ -17,7 +17,7 @@ func main() {
 	if AppConfig.IsReplica() {
 		err := connection.Handshake(&AppConfig)
 		if err != nil {
-			fmt.Println("replica failed to connect: %v", err)
+			fmt.Printf("replica failed to connect: %v", err)
 			os.Exit(1)
 		}
 	}

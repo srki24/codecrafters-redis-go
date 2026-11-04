@@ -49,9 +49,12 @@ func (r Replica) Id() string {
 func (r Replica) String() string {
 	var out strings.Builder
 
-	out.WriteString("role:" + r.role)
-	out.WriteString("master_replid:" + r.masterReplid)
-	out.WriteString("master_repl_offset:" + strconv.Itoa(r.masterReplOffset))
+	out.WriteString("role:")
+	out.WriteString(r.role)
+	out.WriteString("master_replid:")
+	out.WriteString(r.masterReplid)
+	out.WriteString("master_repl_offset:")
+	out.WriteString(strconv.Itoa(r.masterReplOffset))
 
 	return out.String()
 }

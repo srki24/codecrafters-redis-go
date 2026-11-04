@@ -75,10 +75,10 @@ func Handshake(appConfig *config.Config) error {
 		return err
 	}
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", host, port))
-	defer conn.Close()
 	if err != nil {
 		return err
 	}
+	defer conn.Close()
 
 	messages := [][]string{
 		{"PING"},
