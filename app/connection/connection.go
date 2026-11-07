@@ -13,6 +13,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/cmd"
 	"github.com/codecrafters-io/redis-starter-go/app/config"
 	"github.com/codecrafters-io/redis-starter-go/app/db"
+	"github.com/codecrafters-io/redis-starter-go/app/rdb"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
@@ -45,6 +46,14 @@ func handleUserConn(connetion net.Conn, db *db.Database) {
 		}
 		response := cmd.GenerateResponse(command, db, &connStatus)
 		connetion.Write(response.Serialize())
+
+		if connStatus.ShouldRepeplicate() {
+			data, err := rdb.Serialize()
+			if err != nil {
+				continue
+			}
+			connetion.Write(data)
+		}
 	}
 
 }

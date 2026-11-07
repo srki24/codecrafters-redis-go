@@ -12,14 +12,20 @@ import (
 var endTransactionCommands = []string{"EXEC", "DISCARD", "WATCH"}
 
 type ConnStatus struct {
-	queue       []Command
-	transaction bool
-	watching    map[string]time.Time
+	queue        []Command
+	transaction  bool
+	watching     map[string]time.Time
+	isReplica    bool
+	isReplicated bool
 }
 
 func NewConnStatus() ConnStatus {
 	watching := make(map[string]time.Time)
-	return ConnStatus{transaction: false, watching: watching}
+	return ConnStatus{
+		transaction:  false,
+		watching:     watching,
+		isReplica:    false,
+		isReplicated: false}
 }
 
 func (cs *ConnStatus) QueueCommand(command Command) bool {
@@ -30,6 +36,22 @@ func (cs *ConnStatus) QueueCommand(command Command) bool {
 	}
 
 	return shouldQueue
+}
+
+func (cs *ConnStatus) IsReplica() bool {
+	return cs.isReplica
+}
+
+func (cs *ConnStatus) MarkAsReplica() {
+	cs.isReplica = true
+}
+
+func (cs *ConnStatus) ShouldRepeplicate() bool {
+	return cs.isReplica && !cs.isReplicated
+}
+
+func (cs *ConnStatus) MarkReplicated() {
+	cs.isReplicated = true
 }
 
 func (cs *ConnStatus) IsTransaction() bool {

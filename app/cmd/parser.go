@@ -252,6 +252,7 @@ func GenerateResponse(
 		{
 			data := fmt.Sprintf("FULLRESYNC %s 0", database.GetReplica().Id())
 			response = resp.SimpleString{Data: []byte(data)}
+			connState.MarkAsReplica()
 		}
 
 	default:
