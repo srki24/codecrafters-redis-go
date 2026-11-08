@@ -7,8 +7,8 @@ import (
 	"io"
 	"log"
 	"net"
-	"os"
 	"strconv"
+	"sync"
 
 	"github.com/codecrafters-io/redis-starter-go/app/cmd"
 	"github.com/codecrafters-io/redis-starter-go/app/config"
@@ -17,26 +17,43 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
-func handleUserConn(connetion net.Conn, db *db.Database) {
-	defer connetion.Close()
-	connStatus := cmd.NewConnStatus()
+type replicaHub struct {
+	mu       sync.Mutex
+	channels []chan resp.RESPValue
+}
+
+func (rh *replicaHub) addChannel(ch chan resp.RESPValue) {
+	rh.mu.Lock()
+	defer rh.mu.Unlock()
+	rh.channels = append(rh.channels, ch)
+}
+
+func parseRequest(connection net.Conn) (resp.RESPValue, error) {
+	reader := bufio.NewReader(connection)
+	var buff []byte = make([]byte, 2048)
+	n, err := reader.Read(buff)
+	if errors.Is(err, io.EOF) {
+		return nil, err
+	}
+	if err != nil {
+		return nil, err
+	}
+	request, _, err := resp.Parse(buff[:n])
+	if err != nil {
+		return nil, err
+	}
+	return request, nil
+}
+
+func clientLoop(connection net.Conn, connStatus *cmd.ConnStatus, db *db.Database, rh *replicaHub) chan resp.RESPValue {
 	var err error
 	for {
 		if err != nil {
-			connetion.Write([]byte(err.Error()))
+			connection.Write([]byte(err.Error()))
 			err = nil
 			continue
 		}
-		reader := bufio.NewReader(connetion)
-		var buff []byte = make([]byte, 2048)
-		n, err := reader.Read(buff)
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			continue
-		}
-		request, _, err := resp.Parse(buff[:n])
+		request, err := parseRequest(connection)
 		if err != nil {
 			continue
 		}
@@ -44,41 +61,92 @@ func handleUserConn(connetion net.Conn, db *db.Database) {
 		if err != nil {
 			continue
 		}
-		response := cmd.GenerateResponse(command, db, &connStatus)
-		connetion.Write(response.Serialize())
+		response := cmd.GenerateResponse(command, db, connStatus)
+		connection.Write(response.Serialize())
 
-		if connStatus.ShouldRepeplicate() {
-			data, err := rdb.Serialize()
-			if err != nil {
-				continue
-			}
-			connetion.Write(data)
+		// send command to all of the replicas
+		for _, ch := range rh.channels {
+			ch <- request
 		}
+		// client loop exiting
+		if connStatus.ShouldRepeplicate() {
+			ch := make(chan resp.RESPValue)
+			rh.addChannel(ch)
+			return ch // break client loop - connection becomes replica connection
+		}
+	}
+}
+
+func replicaLoop(connection net.Conn, connStatus *cmd.ConnStatus, ch chan resp.RESPValue) {
+	defer close(ch)
+	data, err := rdb.Serialize()
+	if err != nil {
+		log.Printf("failed serialize rdb: %v", err)
+	}
+	_, err = connection.Write(data)
+	if err == nil {
+		log.Printf("failed write rdb: %v", err)
+	}
+	connStatus.MarkReplicated()
+	for data := range ch {
+		connection.Write(data.Serialize())
+	}
+}
+
+func handlClientConn(connection net.Conn, db *db.Database, rh *replicaHub) {
+	defer connection.Close()
+
+	connStatus := cmd.NewConnStatus()
+	ch := clientLoop(connection, &connStatus, db, rh)
+	if connStatus.ShouldRepeplicate() {
+		replicaLoop(connection, &connStatus, ch)
 	}
 
 }
 
-func Open(appConfig *config.Config, database *db.Database) {
+func OpenClient(appConfig *config.Config, database *db.Database) error {
 	l, err := net.Listen(
 		"tcp", fmt.Sprintf("0.0.0.0:%d", appConfig.Port))
+	replicaHub := replicaHub{}
 	if err != nil {
-		log.Println("Failed to bind to port 6379")
-		os.Exit(1)
+		return err
 	}
 	for {
 		conn, err := l.Accept()
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
-				return
+				return nil
 			}
 			log.Printf("accept %v", err)
 			continue
 		}
-		go handleUserConn(conn, database)
+		go handlClientConn(conn, database, &replicaHub)
 	}
 }
 
-func Handshake(appConfig *config.Config) error {
+func handleReplicaConn(connection net.Conn, db *db.Database) {
+	defer connection.Close()
+	connStatus := cmd.NewConnStatus()
+	var err error
+	for {
+		if err != nil {
+			connection.Write([]byte(err.Error()))
+			err = nil
+			continue
+		}
+		request, err := parseRequest(connection)
+		if err != nil {
+			continue
+		}
+		command, err := cmd.ParseCommand(request)
+		if err != nil {
+			continue
+		}
+		_ = cmd.GenerateResponse(command, db, &connStatus)
+	}
+}
+
+func OpenReplica(appConfig *config.Config, database *db.Database) error {
 	host, port, err := appConfig.ParseReplica()
 	if err != nil {
 		return err
@@ -87,25 +155,31 @@ func Handshake(appConfig *config.Config) error {
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	err = handshake(conn, appConfig)
+	if err != nil {
+		return err
+	}
+	go handleReplicaConn(conn, database)
+	return nil
 
+}
+
+func handshake(conn net.Conn, appConfig *config.Config) error {
 	messages := [][]string{
 		{"PING"},
 		{"REPLCONF", "listening-port", strconv.Itoa(appConfig.Port)},
 		{"REPLCONF", "capa", "psync"},
 		{"PSYNC", "?", "-1"},
 	}
-
 	buf := make([]byte, 2048)
 	for _, msg := range messages {
 		fmt.Println(msg)
 		respMsg := resp.NewArray(msg)
-		_, err = conn.Write(respMsg.Serialize())
+		_, err := conn.Write(respMsg.Serialize())
 
 		if err != nil {
 			return err
 		}
-
 		// waiting for response
 		n, err := conn.Read(buf)
 		if err != nil {
@@ -113,6 +187,5 @@ func Handshake(appConfig *config.Config) error {
 		}
 		fmt.Println(buf[:n])
 	}
-
 	return nil
 }
