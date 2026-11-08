@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"os"
 
 	"github.com/codecrafters-io/redis-starter-go/app/config"
@@ -20,15 +20,16 @@ func main() {
 	if AppConfig.IsReplica() {
 		err := connection.OpenReplica(&AppConfig, &db)
 		if err != nil {
-			fmt.Printf("replica failed to connect: %v", err)
+			log.Printf("replica failed to connect: %v", err)
 			os.Exit(1)
 		}
+		log.Printf("connected to replica")
 	}
 
 	// regular mode
 	err := connection.OpenClient(&AppConfig, &db)
 	if err != nil {
-		fmt.Printf("couldnt connect: %v", err)
+		log.Printf("couldnt connect: %v", err)
 		os.Exit(1)
 	}
 
