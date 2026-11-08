@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"slices"
 	"strconv"
 	"sync"
 
@@ -16,6 +17,8 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/rdb"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
+
+var WRITE_COMMANDS = []string{"SET", "DEL", "INCR", "RPUSH", "LPUSH", "LPOP", "RPOP", "BLPOP", "BRPOP", "XADD", "EXEC", "MULTI"}
 
 type replicaHub struct {
 	mu       sync.Mutex
@@ -66,7 +69,9 @@ func clientLoop(connection net.Conn, connStatus *cmd.ConnStatus, db *db.Database
 
 		// send command to all of the replicas
 		for _, ch := range rh.channels {
-			ch <- request
+			if slices.Contains(WRITE_COMMANDS, command.Name) {
+				ch <- request
+			}
 		}
 		// client loop exiting
 		if connStatus.ShouldRepeplicate() {
