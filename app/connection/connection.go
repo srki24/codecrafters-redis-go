@@ -9,6 +9,7 @@ import (
 	"net"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/codecrafters-io/redis-starter-go/app/cmd"
@@ -31,6 +32,23 @@ func (rh *replicaHub) addChannel(ch chan resp.RESPValue) {
 	rh.channels = append(rh.channels, ch)
 }
 
+func (rh *replicaHub) removeChannel(ch chan resp.RESPValue) {
+	rh.mu.Lock()
+	defer rh.mu.Unlock()
+	rh.channels = slices.DeleteFunc(rh.channels, func(c chan resp.RESPValue) bool {
+		return c == ch
+	})
+}
+
+func (rh *replicaHub) publish(v resp.RESPValue) {
+	rh.mu.Lock()
+	defer rh.mu.Unlock()
+
+	for _, ch := range rh.channels {
+		ch <- v
+	}
+}
+
 func parseRequest(connection net.Conn) (resp.RESPValue, error) {
 	reader := bufio.NewReader(connection)
 	var buff []byte = make([]byte, 2048)
@@ -48,7 +66,7 @@ func parseRequest(connection net.Conn) (resp.RESPValue, error) {
 	return request, nil
 }
 
-func clientLoop(connection net.Conn, connStatus *cmd.ConnStatus, db *db.Database, rh *replicaHub) chan resp.RESPValue {
+func clientLoop(connection net.Conn, connStatus *cmd.ConnStatus, db *db.Database, rh *replicaHub) {
 	var err error
 	for {
 		if err != nil {
@@ -68,33 +86,39 @@ func clientLoop(connection net.Conn, connStatus *cmd.ConnStatus, db *db.Database
 		connection.Write(response.Serialize())
 
 		// send command to all of the replicas
-		for _, ch := range rh.channels {
-			if slices.Contains(WRITE_COMMANDS, command.Name) {
-				ch <- request
-			}
+		if slices.Contains(WRITE_COMMANDS, strings.ToUpper(command.Name)) {
+			rh.publish(request)
 		}
 		// client loop exiting
 		if connStatus.ShouldRepeplicate() {
-			ch := make(chan resp.RESPValue)
-			rh.addChannel(ch)
-			return ch // break client loop - connection becomes replica connection
+			return // break client loop - connection becomes replica connection
 		}
 	}
 }
 
-func replicaLoop(connection net.Conn, connStatus *cmd.ConnStatus, ch chan resp.RESPValue) {
-	defer close(ch)
+func replicaLoop(connection net.Conn, connStatus *cmd.ConnStatus, rh *replicaHub) {
 	data, err := rdb.Serialize()
 	if err != nil {
 		log.Printf("failed serialize rdb: %v", err)
+		return
 	}
-	_, err = connection.Write(data)
-	if err == nil {
+
+	if _, err = connection.Write(data); err != nil {
 		log.Printf("failed write rdb: %v", err)
+		return
 	}
+
+	ch := make(chan resp.RESPValue)
+	rh.addChannel(ch)
+	defer rh.removeChannel(ch)
+	defer close(ch)
+
 	connStatus.MarkReplicated()
 	for data := range ch {
-		connection.Write(data.Serialize())
+		if _, err := connection.Write(data.Serialize()); err != nil {
+			log.Printf("failed to write to replica: %v", err)
+			return
+		}
 	}
 }
 
@@ -102,9 +126,9 @@ func handlClientConn(connection net.Conn, db *db.Database, rh *replicaHub) {
 	defer connection.Close()
 
 	connStatus := cmd.NewConnStatus()
-	ch := clientLoop(connection, &connStatus, db, rh)
+	clientLoop(connection, &connStatus, db, rh)
 	if connStatus.ShouldRepeplicate() {
-		replicaLoop(connection, &connStatus, ch)
+		replicaLoop(connection, &connStatus, rh)
 	}
 
 }
@@ -166,7 +190,6 @@ func OpenReplica(appConfig *config.Config, database *db.Database) error {
 	}
 	go handleReplicaConn(conn, database)
 	return nil
-
 }
 
 func handshake(conn net.Conn, appConfig *config.Config) error {
