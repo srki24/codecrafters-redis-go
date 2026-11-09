@@ -46,7 +46,7 @@ func parseArray(data []byte) (Array, int, error) {
 			return Array{}, 0, err
 		}
 		items = append(items, dp)
-		consumeIdx += consumed + 1
+		consumeIdx += consumed
 	}
 
 	return Array{Data: items}, consumeIdx, nil
@@ -63,5 +63,6 @@ func Parse(data []byte) (out RESPValue, consumed int, err error) {
 	default:
 		err = fmt.Errorf("Unknown prefix: %s", string(data[0]))
 	}
+	consumed++ // the type btyye
 	return out, consumed, err
 }

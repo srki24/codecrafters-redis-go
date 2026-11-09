@@ -49,36 +49,49 @@ func (rh *replicaHub) publish(v resp.RESPValue) {
 	}
 }
 
-func parseRequest(connection net.Conn) (resp.RESPValue, error) {
-	reader := bufio.NewReader(connection)
-	var buff []byte = make([]byte, 2048)
-	n, err := reader.Read(buff)
-	if errors.Is(err, io.EOF) {
-		return nil, err
-	}
-	if err != nil {
-		return nil, err
-	}
-	request, _, err := resp.Parse(buff[:n])
-	if err != nil {
-		return nil, err
-	}
-	return request, nil
+func parseRequest(connection net.Conn) chan resp.RESPValue {
+	out := make(chan resp.RESPValue)
+	go func() {
+		defer close(out)
+		reader := bufio.NewReader(connection)
+		for {
+			var start, read int
+			var buff []byte = make([]byte, 2048)
+			read, err := reader.Read(buff[start:])
+			if errors.Is(err, io.EOF) {
+				log.Printf("eof: %v", err)
+				continue
+			}
+			if err != nil {
+				return
+			}
+			for {
+				request, consumed, err := resp.Parse(buff[start:read])
+				if err != nil {
+					log.Printf("failed to parse buff %v", err)
+					break // partial read
+				}
+				out <- request
+				start += consumed
+				if start == read {
+					break
+				}
+
+			}
+		}
+	}()
+	return out
 }
 
 func clientLoop(connection net.Conn, connStatus *cmd.ConnStatus, db *db.Database, rh *replicaHub) {
 	var err error
-	for {
+	for respRequest := range parseRequest(connection) {
 		if err != nil {
 			connection.Write([]byte(err.Error()))
 			err = nil
 			continue
 		}
-		request, err := parseRequest(connection)
-		if err != nil {
-			continue
-		}
-		command, err := cmd.ParseCommand(request)
+		command, err := cmd.ParseCommand(respRequest)
 		if err != nil {
 			continue
 		}
@@ -87,7 +100,7 @@ func clientLoop(connection net.Conn, connStatus *cmd.ConnStatus, db *db.Database
 
 		// send command to all of the replicas
 		if slices.Contains(WRITE_COMMANDS, strings.ToUpper(command.Name)) {
-			rh.publish(request)
+			rh.publish(respRequest)
 		}
 		// client loop exiting
 		if connStatus.ShouldRepeplicate() {
@@ -157,17 +170,13 @@ func handleReplicaConn(connection net.Conn, db *db.Database) {
 	defer connection.Close()
 	connStatus := cmd.NewConnStatus()
 	var err error
-	for {
+	for respRequest := range parseRequest(connection) {
 		if err != nil {
 			connection.Write([]byte(err.Error()))
 			err = nil
 			continue
 		}
-		request, err := parseRequest(connection)
-		if err != nil {
-			continue
-		}
-		command, err := cmd.ParseCommand(request)
+		command, err := cmd.ParseCommand(respRequest)
 		if err != nil {
 			continue
 		}

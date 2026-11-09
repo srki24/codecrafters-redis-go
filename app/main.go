@@ -23,7 +23,6 @@ func main() {
 			log.Printf("replica failed to connect: %v", err)
 			os.Exit(1)
 		}
-		log.Printf("connected to replica")
 	}
 
 	// regular mode
