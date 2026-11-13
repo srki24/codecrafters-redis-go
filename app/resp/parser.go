@@ -7,11 +7,13 @@ import (
 )
 
 func parseSimpleString(data []byte) (SimpleString, int) {
+	// +<data>\r\n
 	lenIdx := bytes.Index(data, []byte("\r\n"))
 	return SimpleString{Data: data[:lenIdx]}, lenIdx + 2
 }
 
 func parseBulkString(data []byte) (BulkString, int, error) {
+	// $<length>\r\n<data>\r\n
 	lenIdx := bytes.Index(data, []byte("\r\n"))
 
 	dataLen, err := strconv.Atoi(string(data[:lenIdx]))
@@ -23,14 +25,14 @@ func parseBulkString(data []byte) (BulkString, int, error) {
 	if dataLen == -1 {
 		return BulkString{}, lenIdx + 2, nil
 	}
-	strStart := lenIdx + 2
+	strStart := lenIdx + 2 // skip /r/n
 	strEnd := strStart + dataLen
 	return BulkString{Data: data[strStart:strEnd]}, strEnd + 2, nil
 
 }
 
 func parseArray(data []byte) (Array, int, error) {
-
+	// *<number-of-elements>\r\n<element-1>...<element-n>
 	lenIdx := bytes.Index(data, []byte("\r\n"))
 	var items []RESPValue
 	nrElements, _ := strconv.Atoi(string(data[:lenIdx]))

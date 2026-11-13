@@ -74,6 +74,9 @@ func (db *Database) GetReplica() Replica {
 	return db.replica
 }
 
+func (db *Database) IsMaster() bool {
+	return db.replica.role == "master"
+}
 func NewDatabase(config *config.Config) Database {
 	data := make(map[string]Data)
 	replica := newReplica(config)

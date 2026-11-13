@@ -247,7 +247,17 @@ func GenerateResponse(
 			response = resp.BulkString{Data: []byte(data)}
 		}
 	case "REPLCONF":
-		response = resp.SimpleString{Data: []byte("OK")}
+		{
+			if data, err := replconf(command); err != nil {
+				response = resp.SimpleError{Data: err.Error()}
+			} else {
+				if len(data) == 1 {
+					response = resp.SimpleString{Data: []byte(data[0])}
+				} else {
+					response = resp.NewArray(data)
+				}
+			}
+		}
 	case "PSYNC":
 		{
 			data := fmt.Sprintf("FULLRESYNC %s 0", database.GetReplica().Id())
