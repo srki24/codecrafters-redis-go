@@ -62,7 +62,7 @@ func parseRequest(connection net.Conn) chan resp.RESPValue {
 			read, err := reader.Read(buff[start:])
 			if errors.Is(err, io.EOF) {
 				// log.Printf("eof: %v", err)
-				time.Sleep(time.Millisecond * 250)
+				time.Sleep(time.Millisecond * 50)
 				continue
 			}
 			if err != nil {
