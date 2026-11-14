@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"slices"
@@ -60,10 +59,10 @@ func parseRequest(connection net.Conn) chan resp.RESPValue {
 			var buff []byte = make([]byte, 2048)
 			read, err := reader.Read(buff[start:])
 			// if errors.Is(err, io.EOF) {
-				// return
-				// time.Sleep(time.Millisecond * 500)
-				// continue
-			}
+			// return
+			// time.Sleep(time.Millisecond * 500)
+			// continue
+			// }
 			if err != nil {
 				return
 			}
