@@ -61,7 +61,6 @@ func parseRequest(connection net.Conn) chan resp.RESPValue {
 			var buff []byte = make([]byte, 2048)
 			read, err := reader.Read(buff[start:])
 			if errors.Is(err, io.EOF) {
-				// log.Printf("eof: %v", err)
 				time.Sleep(time.Millisecond * 500)
 				continue
 			}
