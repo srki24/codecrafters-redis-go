@@ -49,11 +49,10 @@ func (rh *replicaHub) publish(v resp.RESPValue) {
 	}
 }
 
-func parseRequest(connection net.Conn) chan resp.RESPValue {
+func parseRequest(reader *bufio.Reader) chan resp.RESPValue {
 	out := make(chan resp.RESPValue)
 	go func() {
 		defer close(out)
-		reader := bufio.NewReader(connection)
 		for {
 			var start, read int
 			var buff []byte = make([]byte, 2048)
@@ -79,9 +78,9 @@ func parseRequest(connection net.Conn) chan resp.RESPValue {
 	return out
 }
 
-func clientLoop(connection net.Conn, connStatus *cmd.ConnStatus, db *db.Database, rh *replicaHub) {
+func clientLoop(connection net.Conn, reader *bufio.Reader, connStatus *cmd.ConnStatus, db *db.Database, rh *replicaHub) {
 	var err error
-	for respRequest := range parseRequest(connection) {
+	for respRequest := range parseRequest(reader) {
 		if err != nil {
 			connection.Write([]byte(err.Error()))
 			err = nil
@@ -140,7 +139,8 @@ func replicaLoop(connection net.Conn, connStatus *cmd.ConnStatus, rh *replicaHub
 
 func handlClientConn(connection net.Conn, db *db.Database, connStatus *cmd.ConnStatus, rh *replicaHub) {
 	defer connection.Close()
-	clientLoop(connection, connStatus, db, rh)
+	reader := bufio.NewReader(connection)
+	clientLoop(connection, reader, connStatus, db, rh)
 	if connStatus.ShouldRepeplicate() {
 		replicaLoop(connection, connStatus, rh)
 	}
@@ -183,15 +183,15 @@ func OpenReplica(appConfig *config.Config, database *db.Database) error {
 	}
 
 	// TODO PARSE RDB FILE
-	buf := make([]byte, 2048)
-	conn.Read(buf)
+	reader := bufio.NewReader(conn)
+	reader.ReadBytes('\n')
 
 	connStatus := cmd.NewConnStatus()
 	connStatus.MarkReplicated() // replica cannot be replicated further down
 	connStatus.MarkAsReplica()
 
 	replicaHub := replicaHub{}
-	go clientLoop(conn, &connStatus, database, &replicaHub)
+	go clientLoop(conn, reader, &connStatus, database, &replicaHub)
 	return nil
 }
 
