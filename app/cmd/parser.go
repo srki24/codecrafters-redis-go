@@ -248,6 +248,7 @@ func GenerateResponse(
 		}
 	case "REPLCONF":
 		{
+			fmt.Println("INNs")
 			if data, err := replconf(command); err != nil {
 				response = resp.SimpleError{Data: err.Error()}
 			} else {

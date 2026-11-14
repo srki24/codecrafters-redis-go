@@ -58,11 +58,6 @@ func parseRequest(connection net.Conn) chan resp.RESPValue {
 			var start, read int
 			var buff []byte = make([]byte, 2048)
 			read, err := reader.Read(buff[start:])
-			// if errors.Is(err, io.EOF) {
-			// return
-			// time.Sleep(time.Millisecond * 500)
-			// continue
-			// }
 			if err != nil {
 				return
 			}
@@ -96,10 +91,12 @@ func clientLoop(connection net.Conn, connStatus *cmd.ConnStatus, db *db.Database
 		if err != nil {
 			continue
 		}
+		fmt.Println(command)
 		response := cmd.GenerateResponse(command, db, connStatus)
 		if !connStatus.IsReplica() || slices.Contains(REPLICA_COMMANDS, strings.ToUpper(command.Name)) {
 			_, err = connection.Write(response.Serialize())
 			if err != nil {
+				fmt.Printf("err: %v\n", err)
 				continue
 			}
 		}
@@ -214,11 +211,10 @@ func handshake(conn net.Conn, appConfig *config.Config) error {
 			return err
 		}
 		// waiting for response
-		n, err := conn.Read(buf)
+		_, err = conn.Read(buf)
 		if err != nil {
 			return err
 		}
-		log.Println(string(buf[:n]))
 	}
 	return nil
 }
