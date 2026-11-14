@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/codecrafters-io/redis-starter-go/app/cmd"
 	"github.com/codecrafters-io/redis-starter-go/app/config"
@@ -60,8 +61,8 @@ func parseRequest(connection net.Conn) chan resp.RESPValue {
 			var buff []byte = make([]byte, 2048)
 			read, err := reader.Read(buff[start:])
 			if errors.Is(err, io.EOF) {
-				log.Printf("eof: %v", err)
-				// time.Sleep(time.Millisecond * 250)
+				// log.Printf("eof: %v", err)
+				time.Sleep(time.Millisecond * 250)
 				continue
 			}
 			if err != nil {
