@@ -1,6 +1,7 @@
 package connection
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"log"
@@ -118,12 +119,13 @@ func clientLoop(rw *ConnRW, connStatus *cmd.ConnStatus, db *db.Database, rh *rep
 }
 
 func replicaLoop(w *ConnRW, connStatus *cmd.ConnStatus, rh *replicaHub) {
-	ch := make(chan Serializeable)
+	if _, err := w.Write(rdb.RDB{}.Serialize()); err != nil {
+		return
+	}
+	ch := make(chan Serializeable, 16)
 	rh.addChannel(ch)
 	defer rh.removeChannel(ch)
 	defer close(ch)
-	ch <- rdb.RDB{}
-	connStatus.MarkReplicated()
 	for data := range ch {
 		// write channel commands to appropriate replica
 		if _, err := w.Write(data.Serialize()); err != nil {
@@ -220,7 +222,8 @@ func readRDB(crw *ConnRW) error {
 	if err != nil {
 		return err
 	}
-	n, err := strconv.Atoi(string(header[1 : len(header)-1]))
+	toIdx := bytes.Index(header, []byte("\r\n"))
+	n, err := strconv.Atoi(string(header[1:toIdx]))
 	buf := make([]byte, n)
 	_, err = crw.ReadFull(buf)
 	fmt.Println(string(buf))
