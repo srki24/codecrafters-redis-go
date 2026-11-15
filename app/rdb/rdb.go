@@ -11,6 +11,5 @@ type RDB struct{}
 
 func (rdb RDB) Serialize() []byte {
 	data, _ := base64.StdEncoding.DecodeString(EMPTY_FILE)
-
 	return fmt.Appendf(nil, "$%d\r\n%s", len(data), data)
 }

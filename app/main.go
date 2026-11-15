@@ -18,11 +18,13 @@ func main() {
 
 	// replication mode
 	if AppConfig.IsReplica() {
-		err := connection.OpenReplica(&AppConfig, &db)
-		if err != nil {
-			log.Printf("replica failed to connect: %v", err)
-			os.Exit(1)
-		}
+		go func() {
+			err := connection.OpenReplica(&AppConfig, &db)
+			if err != nil {
+				log.Printf("replica failed to connect: %v", err)
+				os.Exit(1)
+			}
+		}()
 	}
 	// regular mode
 	err := connection.OpenClient(&AppConfig, &db)

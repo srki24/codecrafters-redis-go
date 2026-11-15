@@ -1,9 +1,9 @@
 package connection
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"slices"
@@ -182,7 +182,10 @@ func OpenReplica(appConfig *config.Config, database *db.Database) error {
 		return err
 	}
 
-	readRDB(&rw)
+	err = readRDB(&rw)
+	if err != nil {
+		return err
+	}
 
 	connStatus := cmd.NewConnStatus()
 	connStatus.MarkReplicated() // replica cannot be replicated further down
@@ -222,10 +225,12 @@ func readRDB(crw *ConnRW) error {
 	if err != nil {
 		return err
 	}
-	toIdx := bytes.Index(header, []byte("\r\n"))
-	n, err := strconv.Atoi(string(header[1:toIdx]))
+	n, err := strconv.Atoi(string(header[1 : len(header)-2]))
 	buf := make([]byte, n)
 	_, err = crw.ReadFull(buf)
-	fmt.Println(string(buf))
+	if errors.Is(err, io.EOF) {
+		log.Println("EOF")
+		return nil
+	}
 	return err
 }
