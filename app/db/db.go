@@ -77,6 +77,14 @@ func (db *Database) GetReplica() Replica {
 func (db *Database) IsMaster() bool {
 	return db.replica.role == "master"
 }
+
+func (db *Database) AddReplicaOffset(n int) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	db.replica.AddOffset(n)
+}
+
 func NewDatabase(config *config.Config) Database {
 	data := make(map[string]Data)
 	replica := newReplica(config)
@@ -91,9 +99,7 @@ func Update[T any](
 	defer database.mu.Unlock()
 
 	data, exists := database.get(key)
-
 	next, out, err := fn(data, exists)
-
 	if err != nil {
 		return out, err
 	}
@@ -104,7 +110,6 @@ func Update[T any](
 	next.UpdatedTime = now
 	database.data[key] = next
 	return out, nil
-
 }
 
 // Db value interface

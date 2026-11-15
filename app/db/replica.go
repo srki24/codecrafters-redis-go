@@ -14,7 +14,7 @@ type Replica struct {
 	role             string
 	masterReplid     string
 	masterReplOffset int
-	offet            int
+	offset           int
 }
 
 func generateReplicaId() string {
@@ -41,15 +41,16 @@ func newReplica(config *config.Config) Replica {
 		role:             role,
 		masterReplid:     generateReplicaId(),
 		masterReplOffset: 0,
+		offset:           0,
 	}
 }
 
-func (r Replica) Consume(n int) {
-	r.offet += n
+func (r *Replica) AddOffset(n int) {
+	r.offset += n
 }
 
-func (r Replica) Offset() int {
-	return r.offet
+func (r Replica) GetOffset() int {
+	return r.offset
 }
 
 func (r Replica) Id() string {

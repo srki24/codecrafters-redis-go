@@ -39,7 +39,7 @@ func replconf(command Command, database *db.Database) ([]string, error) {
 		return []string{
 			"REPLCONF",
 			"ACK",
-			strconv.Itoa(database.GetReplica().Offset()),
+			strconv.Itoa(database.GetReplica().GetOffset()),
 		}, nil
 	}
 	return nil, fmt.Errorf("unknown args: %s", args)

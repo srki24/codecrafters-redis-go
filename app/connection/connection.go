@@ -113,7 +113,7 @@ func clientLoop(rw *ConnRW, connStatus *cmd.ConnStatus, db *db.Database, rh *rep
 			}
 		}
 
-		// client loop exiting
+		// Master exit the client loop and replicate
 		if connStatus.ShouldRepeplicate() {
 			return // break client loop - connection becomes replica connection
 		}
@@ -121,8 +121,7 @@ func clientLoop(rw *ConnRW, connStatus *cmd.ConnStatus, db *db.Database, rh *rep
 		// replica connection with master
 		if connStatus.IsReplica() && connStatus.IsReplicated() {
 			n := len(respRequest.Serialize())
-			fmt.Println(n)
-			db.GetReplica().Consume(n)
+			db.AddReplicaOffset(n)
 
 		}
 	}
