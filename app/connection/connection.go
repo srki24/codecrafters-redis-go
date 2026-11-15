@@ -203,7 +203,6 @@ func handshake(rw *ConnRW, appConfig *config.Config) error {
 		{"REPLCONF", "capa", "psync"},
 		{"PSYNC", "?", "-1"},
 	}
-	buf := make([]byte, 2048)
 	for _, msg := range messages {
 		respMsg := resp.NewArray(msg)
 		_, err := rw.Write(respMsg.Serialize())
@@ -212,8 +211,10 @@ func handshake(rw *ConnRW, appConfig *config.Config) error {
 			return err
 		}
 		// waiting for response
-		_, err = rw.Read(buf)
-		if err != nil {
+		if _, err = rw.ReadBytes('\n'); err != nil { // +FULLRESYNC <id> 0\r\n
+			if !errors.Is(err, io.EOF) {
+				return nil
+			}
 			return err
 		}
 	}
@@ -228,9 +229,9 @@ func readRDB(crw *ConnRW) error {
 	n, err := strconv.Atoi(string(header[1 : len(header)-2]))
 	buf := make([]byte, n)
 	_, err = crw.ReadFull(buf)
-	if errors.Is(err, io.EOF) {
-		log.Println("EOF")
-		return nil
+	if err != nil && !errors.Is(err, io.EOF) {
+		fmt.Println("EOFF")
+		return err
 	}
 	return err
 }
