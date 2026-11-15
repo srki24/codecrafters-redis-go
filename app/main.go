@@ -24,7 +24,6 @@ func main() {
 			os.Exit(1)
 		}
 	}
-
 	// regular mode
 	err := connection.OpenClient(&AppConfig, &db)
 	if err != nil {

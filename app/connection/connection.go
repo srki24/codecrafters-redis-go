@@ -1,7 +1,6 @@
 package connection
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"log"
@@ -23,24 +22,28 @@ var REPLICA_COMMANDS = []string{"INFO", "REPLCONF", "PSYNC"}
 
 type replicaHub struct {
 	mu       sync.Mutex
-	channels []chan resp.RESPValue
+	channels []chan Serializeable
 }
 
-func (rh *replicaHub) addChannel(ch chan resp.RESPValue) {
+type Serializeable interface {
+	Serialize() []byte
+}
+
+func (rh *replicaHub) addChannel(ch chan Serializeable) {
 	rh.mu.Lock()
 	defer rh.mu.Unlock()
 	rh.channels = append(rh.channels, ch)
 }
 
-func (rh *replicaHub) removeChannel(ch chan resp.RESPValue) {
+func (rh *replicaHub) removeChannel(ch chan Serializeable) {
 	rh.mu.Lock()
 	defer rh.mu.Unlock()
-	rh.channels = slices.DeleteFunc(rh.channels, func(c chan resp.RESPValue) bool {
+	rh.channels = slices.DeleteFunc(rh.channels, func(c chan Serializeable) bool {
 		return c == ch
 	})
 }
 
-func (rh *replicaHub) publish(v resp.RESPValue) {
+func (rh *replicaHub) publish(v Serializeable) {
 	rh.mu.Lock()
 	defer rh.mu.Unlock()
 
@@ -49,40 +52,42 @@ func (rh *replicaHub) publish(v resp.RESPValue) {
 	}
 }
 
-func parseRequest(reader *bufio.Reader) chan resp.RESPValue {
+func parseRequest(reader *ConnRW) chan resp.RESPValue {
 	out := make(chan resp.RESPValue)
 	go func() {
 		defer close(out)
+		var pending []byte
+		tmp := make([]byte, 4096)
+
 		for {
-			var start, read int
-			var buff []byte = make([]byte, 2048)
-			read, err := reader.Read(buff[start:])
+			n, err := reader.Read(tmp)
 			if err != nil {
 				return
 			}
-			for {
-				request, consumed, err := resp.Parse(buff[start:read])
-				if err != nil {
-					log.Printf("failed to parse buff %v", err)
+			if n > 0 {
+				pending = append(pending, tmp[:n]...)
+			}
+			for len(pending) > 0 {
+				request, consumed, perr := resp.Parse(pending)
+				if errors.Is(perr, resp.ErrIncomplete) {
 					break // partial read
 				}
-				out <- request
-				start += consumed
-				if start == read {
-					break
+				if perr != nil {
+					return
 				}
-
+				out <- request
+				pending = pending[consumed:]
 			}
 		}
 	}()
 	return out
 }
 
-func clientLoop(connection net.Conn, reader *bufio.Reader, connStatus *cmd.ConnStatus, db *db.Database, rh *replicaHub) {
+func clientLoop(rw *ConnRW, connStatus *cmd.ConnStatus, db *db.Database, rh *replicaHub) {
 	var err error
-	for respRequest := range parseRequest(reader) {
+	for respRequest := range parseRequest(rw) {
 		if err != nil {
-			connection.Write([]byte(err.Error()))
+			rw.Write([]byte(err.Error()))
 			err = nil
 			continue
 		}
@@ -90,10 +95,10 @@ func clientLoop(connection net.Conn, reader *bufio.Reader, connStatus *cmd.ConnS
 		if err != nil {
 			continue
 		}
-		fmt.Println(command)
+
 		response := cmd.GenerateResponse(command, db, connStatus)
 		if !connStatus.IsReplica() || slices.Contains(REPLICA_COMMANDS, strings.ToUpper(command.Name)) {
-			_, err = connection.Write(response.Serialize())
+			_, err = rw.Write(response.Serialize())
 			if err != nil {
 				fmt.Printf("err: %v\n", err)
 				continue
@@ -112,25 +117,16 @@ func clientLoop(connection net.Conn, reader *bufio.Reader, connStatus *cmd.ConnS
 	}
 }
 
-func replicaLoop(connection net.Conn, connStatus *cmd.ConnStatus, rh *replicaHub) {
-	data, err := rdb.Serialize()
-	if err != nil {
-		log.Printf("failed serialize rdb: %v", err)
-		return
-	}
-	if _, err = connection.Write(data); err != nil {
-		log.Printf("failed write rdb: %v", err)
-		return
-	}
-	ch := make(chan resp.RESPValue)
+func replicaLoop(w *ConnRW, connStatus *cmd.ConnStatus, rh *replicaHub) {
+	ch := make(chan Serializeable)
 	rh.addChannel(ch)
 	defer rh.removeChannel(ch)
 	defer close(ch)
-
+	ch <- rdb.RDB{}
 	connStatus.MarkReplicated()
 	for data := range ch {
 		// write channel commands to appropriate replica
-		if _, err := connection.Write(data.Serialize()); err != nil {
+		if _, err := w.Write(data.Serialize()); err != nil {
 			log.Printf("failed to write to replica: %v", err)
 			return
 		}
@@ -139,10 +135,11 @@ func replicaLoop(connection net.Conn, connStatus *cmd.ConnStatus, rh *replicaHub
 
 func handlClientConn(connection net.Conn, db *db.Database, connStatus *cmd.ConnStatus, rh *replicaHub) {
 	defer connection.Close()
-	reader := bufio.NewReader(connection)
-	clientLoop(connection, reader, connStatus, db, rh)
+	rw := NewConnRW(connection)
+
+	clientLoop(&rw, connStatus, db, rh)
 	if connStatus.ShouldRepeplicate() {
-		replicaLoop(connection, connStatus, rh)
+		replicaLoop(&rw, connStatus, rh)
 	}
 
 }
@@ -177,25 +174,24 @@ func OpenReplica(appConfig *config.Config, database *db.Database) error {
 	if err != nil {
 		return err
 	}
-	err = handshake(conn, appConfig)
+	rw := NewConnRW(conn)
+	err = handshake(&rw, appConfig)
 	if err != nil {
 		return err
 	}
 
-	// TODO PARSE RDB FILE
-	reader := bufio.NewReader(conn)
-	reader.ReadBytes('\n')
+	readRDB(&rw)
 
 	connStatus := cmd.NewConnStatus()
 	connStatus.MarkReplicated() // replica cannot be replicated further down
 	connStatus.MarkAsReplica()
 
 	replicaHub := replicaHub{}
-	go clientLoop(conn, reader, &connStatus, database, &replicaHub)
+	go clientLoop(&rw, &connStatus, database, &replicaHub)
 	return nil
 }
 
-func handshake(conn net.Conn, appConfig *config.Config) error {
+func handshake(rw *ConnRW, appConfig *config.Config) error {
 	messages := [][]string{
 		{"PING"},
 		{"REPLCONF", "listening-port", strconv.Itoa(appConfig.Port)},
@@ -205,16 +201,28 @@ func handshake(conn net.Conn, appConfig *config.Config) error {
 	buf := make([]byte, 2048)
 	for _, msg := range messages {
 		respMsg := resp.NewArray(msg)
-		_, err := conn.Write(respMsg.Serialize())
+		_, err := rw.Write(respMsg.Serialize())
 
 		if err != nil {
 			return err
 		}
 		// waiting for response
-		_, err = conn.Read(buf)
+		_, err = rw.Read(buf)
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func readRDB(crw *ConnRW) error {
+	header, err := crw.ReadBytes('\n') // $88/r/n
+	if err != nil {
+		return err
+	}
+	n, err := strconv.Atoi(string(header[1 : len(header)-1]))
+	buf := make([]byte, n)
+	_, err = crw.ReadFull(buf)
+	fmt.Println(string(buf))
+	return err
 }

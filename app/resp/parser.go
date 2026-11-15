@@ -2,20 +2,28 @@ package resp
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"strconv"
 )
 
-func parseSimpleString(data []byte) (SimpleString, int) {
+var ErrIncomplete = errors.New("incomplete resp value")
+
+func parseSimpleString(data []byte) (SimpleString, int, error) {
 	// +<data>\r\n
 	lenIdx := bytes.Index(data, []byte("\r\n"))
-	return SimpleString{Data: data[:lenIdx]}, lenIdx + 2
+	if lenIdx < 0 {
+		return SimpleString{}, 0, ErrIncomplete
+	}
+	return SimpleString{Data: data[:lenIdx]}, lenIdx + 2, nil
 }
 
 func parseBulkString(data []byte) (BulkString, int, error) {
 	// $<length>\r\n<data>\r\n
 	lenIdx := bytes.Index(data, []byte("\r\n"))
-
+	if lenIdx < 0 {
+		return BulkString{}, 0, ErrIncomplete
+	}
 	dataLen, err := strconv.Atoi(string(data[:lenIdx]))
 
 	if err != nil {
@@ -27,6 +35,10 @@ func parseBulkString(data []byte) (BulkString, int, error) {
 	}
 	strStart := lenIdx + 2 // skip /r/n
 	strEnd := strStart + dataLen
+
+	if strEnd+2 > len(data) {
+		return BulkString{}, 0, ErrIncomplete
+	}
 	return BulkString{Data: data[strStart:strEnd]}, strEnd + 2, nil
 
 }
@@ -34,12 +46,17 @@ func parseBulkString(data []byte) (BulkString, int, error) {
 func parseArray(data []byte) (Array, int, error) {
 	// *<number-of-elements>\r\n<element-1>...<element-n>
 	lenIdx := bytes.Index(data, []byte("\r\n"))
+	if lenIdx < 0 {
+		return Array{}, 0, ErrIncomplete
+	}
+
 	var items []RESPValue
 	nrElements, _ := strconv.Atoi(string(data[:lenIdx]))
 
 	if nrElements == -1 {
 		return Array{}, lenIdx + 2, nil
 	}
+
 	consumeIdx := lenIdx + 2
 	for range nrElements {
 		dp, consumed, err := Parse(data[consumeIdx:])
@@ -55,9 +72,12 @@ func parseArray(data []byte) (Array, int, error) {
 }
 
 func Parse(data []byte) (out RESPValue, consumed int, err error) {
+	if len(data) == 0 {
+		return nil, 0, ErrIncomplete
+	}
 	switch data[0] {
 	case '+':
-		out, consumed = parseSimpleString(data[1:])
+		out, consumed, err = parseSimpleString(data[1:])
 	case '$':
 		out, consumed, err = parseBulkString(data[1:])
 	case '*':
@@ -65,6 +85,10 @@ func Parse(data []byte) (out RESPValue, consumed int, err error) {
 	default:
 		err = fmt.Errorf("Unknown prefix: %s", string(data[0]))
 	}
-	consumed++ // the type btyye
-	return out, consumed, err
+	if err != nil {
+		return nil, 0, err
+	}
+	consumed++ // the type byte
+	return out, consumed, nil
+
 }
