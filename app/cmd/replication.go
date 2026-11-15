@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/codecrafters-io/redis-starter-go/app/db"
@@ -23,7 +24,7 @@ func Info(command Command, database *db.Database) string {
 
 }
 
-func replconf(command Command) ([]string, error) {
+func replconf(command Command, database *db.Database) ([]string, error) {
 	args := command.Args
 	if len(args) < 2 {
 		return nil, errors.New("not enought args")
@@ -35,7 +36,11 @@ func replconf(command Command) ([]string, error) {
 		return []string{"OK"}, nil
 	}
 	if strings.ToUpper(args[0]) == "GETACK" {
-		return []string{"REPLCONF", "ACK", "0"}, nil
+		return []string{
+			"REPLCONF",
+			"ACK",
+			strconv.Itoa(database.GetReplica().Offset()),
+		}, nil
 	}
 	return nil, fmt.Errorf("unknown args: %s", args)
 

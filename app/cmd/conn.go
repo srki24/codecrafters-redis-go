@@ -42,6 +42,10 @@ func (cs *ConnStatus) IsReplica() bool {
 	return cs.isReplica
 }
 
+func (cs *ConnStatus) IsReplicated() bool {
+	return cs.isReplicated
+}
+
 func (cs *ConnStatus) MarkAsReplica() {
 	cs.isReplica = true
 }

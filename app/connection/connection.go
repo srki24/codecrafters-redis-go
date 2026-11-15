@@ -92,6 +92,7 @@ func clientLoop(rw *ConnRW, connStatus *cmd.ConnStatus, db *db.Database, rh *rep
 			err = nil
 			continue
 		}
+
 		command, err := cmd.ParseCommand(respRequest)
 		if err != nil {
 			continue
@@ -111,9 +112,18 @@ func clientLoop(rw *ConnRW, connStatus *cmd.ConnStatus, db *db.Database, rh *rep
 				rh.publish(respRequest)
 			}
 		}
+
 		// client loop exiting
 		if connStatus.ShouldRepeplicate() {
 			return // break client loop - connection becomes replica connection
+		}
+
+		// replica connection with master
+		if connStatus.IsReplica() && connStatus.IsReplicated() {
+			n := len(respRequest.Serialize())
+			fmt.Println(n)
+			db.GetReplica().Consume(n)
+
 		}
 	}
 }

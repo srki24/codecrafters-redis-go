@@ -248,7 +248,7 @@ func GenerateResponse(
 		}
 	case "REPLCONF":
 		{
-			data, err := replconf(command)
+			data, err := replconf(command, database)
 			if err != nil {
 				response = resp.SimpleError{Data: err.Error()}
 			} else {
