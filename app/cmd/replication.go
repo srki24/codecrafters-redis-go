@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/codecrafters-io/redis-starter-go/app/db"
 )
@@ -44,4 +45,27 @@ func replconf(command Command, database *db.Database) ([]string, error) {
 	}
 	return nil, fmt.Errorf("unknown args: %s", args)
 
+}
+
+func wait(command Command, database *db.Database) (int, error) {
+	args := command.Args
+	if len(args) < 2 {
+		return 0, errors.New("not enought args")
+	}
+	timeout := args[1]
+	timeoutMs, err := strconv.Atoi(timeout)
+	if err != nil {
+		return 0, err
+	}
+	start := time.Now()
+	for {
+		end := time.Now()
+		time.Sleep(500 * time.Microsecond)
+
+		if end.Sub(start).Milliseconds() > int64(timeoutMs) {
+			return 0, errors.New("timeout")
+		}
+		break
+	}
+	return 0, nil
 }

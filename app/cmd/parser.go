@@ -265,6 +265,14 @@ func GenerateResponse(
 			response = resp.SimpleString{Data: []byte(data)}
 			connState.MarkAsReplica()
 		}
+	case "WAIT":
+		{
+			if data, err := wait(command, database); err != nil {
+				response = resp.SimpleError{Data: err.Error()}
+			} else {
+				response = resp.Integer{Data: data}
+			}
+		}
 
 	default:
 		response = resp.SimpleError{Data: fmt.Sprintf("uknown command: %s", command.Name)}

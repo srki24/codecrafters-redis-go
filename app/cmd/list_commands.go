@@ -172,11 +172,9 @@ func ListBLPop(cmd Command, database *db.Database) ([]string, error) {
 
 	key := args[0]
 	timeout, err := strconv.ParseFloat(args[1], 64)
-
 	if err != nil {
 		return nil, err
 	}
-
 	popCmd := Command{Name: "POP", Args: []string{key}}
 
 	start := time.Now()
