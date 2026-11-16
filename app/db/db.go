@@ -78,10 +78,10 @@ func (db *Database) IsMaster() bool {
 	return db.replica.role == "master"
 }
 
-func (db *Database) AddReplicaOffset(n int) {
+func (db *Database) AddReplicaOffset(request []byte) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
-
+	n := len(request)
 	db.replica.AddOffset(n)
 }
 

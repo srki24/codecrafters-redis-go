@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/codecrafters-io/redis-starter-go/app/db"
+	"github.com/codecrafters-io/redis-starter-go/app/repl"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
@@ -63,7 +64,8 @@ func ParseCommand(input resp.RESPValue) (Command, error) {
 func GenerateResponse(
 	command Command,
 	database *db.Database,
-	connState *ConnStatus) (response resp.RESPValue) {
+	connState *ConnStatus,
+	rh *repl.Hub) (response resp.RESPValue) {
 	if ok := connState.QueueCommand(command); ok {
 		response = resp.SimpleString{Data: []byte("QUEUED")}
 		return
@@ -212,7 +214,7 @@ func GenerateResponse(
 
 					var responses []resp.RESPValue
 					for _, cmd := range queue {
-						r := GenerateResponse(cmd, database, connState)
+						r := GenerateResponse(cmd, database, connState, rh)
 						responses = append(responses, r)
 					}
 					response = resp.Array{Data: responses}
@@ -267,7 +269,7 @@ func GenerateResponse(
 		}
 	case "WAIT":
 		{
-			if data, err := wait(command, database); err != nil {
+			if data, err := wait(command, database, rh); err != nil {
 				response = resp.SimpleError{Data: err.Error()}
 			} else {
 				response = resp.Integer{Data: data}

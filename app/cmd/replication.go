@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/codecrafters-io/redis-starter-go/app/db"
+	"github.com/codecrafters-io/redis-starter-go/app/repl"
 )
 
 func Info(command Command, database *db.Database) string {
@@ -47,7 +48,7 @@ func replconf(command Command, database *db.Database) ([]string, error) {
 
 }
 
-func wait(command Command, database *db.Database) (int, error) {
+func wait(command Command, database *db.Database, rh *repl.Hub) (int, error) {
 	args := command.Args
 	if len(args) < 2 {
 		return 0, errors.New("not enought args")
@@ -56,6 +57,10 @@ func wait(command Command, database *db.Database) (int, error) {
 	timeoutMs, err := strconv.Atoi(timeout)
 	if err != nil {
 		return 0, err
+	}
+
+	if database.GetReplica().GetOffset() == 0 {
+		return rh.NumberOfReplica(), nil
 	}
 	start := time.Now()
 	for {

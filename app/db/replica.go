@@ -11,10 +11,9 @@ import (
 const idSize = 40
 
 type Replica struct {
-	role             string
-	masterReplid     string
-	masterReplOffset int
-	offset           int
+	role   string
+	id     string
+	offset int
 }
 
 func generateReplicaId() string {
@@ -38,10 +37,9 @@ func newReplica(config *config.Config) Replica {
 	}
 
 	return Replica{
-		role:             role,
-		masterReplid:     generateReplicaId(),
-		masterReplOffset: 0,
-		offset:           0,
+		role:   role,
+		id:     generateReplicaId(),
+		offset: 0,
 	}
 }
 
@@ -54,8 +52,7 @@ func (r Replica) GetOffset() int {
 }
 
 func (r Replica) Id() string {
-
-	return r.masterReplid
+	return r.id
 }
 
 func (r Replica) String() string {
@@ -64,9 +61,8 @@ func (r Replica) String() string {
 	out.WriteString("role:")
 	out.WriteString(r.role)
 	out.WriteString("master_replid:")
-	out.WriteString(r.masterReplid)
+	out.WriteString(r.id)
 	out.WriteString("master_repl_offset:")
-	out.WriteString(strconv.Itoa(r.masterReplOffset))
-
+	out.WriteString(strconv.Itoa(r.offset))
 	return out.String()
 }

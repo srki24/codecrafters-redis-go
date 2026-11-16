@@ -9,49 +9,17 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/codecrafters-io/redis-starter-go/app/cmd"
 	"github.com/codecrafters-io/redis-starter-go/app/config"
 	"github.com/codecrafters-io/redis-starter-go/app/db"
 	"github.com/codecrafters-io/redis-starter-go/app/rdb"
+	"github.com/codecrafters-io/redis-starter-go/app/repl"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
 var WRITE_COMMANDS = []string{"SET", "DEL", "INCR", "RPUSH", "LPUSH", "LPOP", "RPOP", "BLPOP", "BRPOP", "XADD", "EXEC", "MULTI"}
 var REPLICA_COMMANDS = []string{"INFO", "REPLCONF", "PSYNC"}
-
-type replicaHub struct {
-	mu       sync.Mutex
-	channels []chan Serializeable
-}
-
-type Serializeable interface {
-	Serialize() []byte
-}
-
-func (rh *replicaHub) addChannel(ch chan Serializeable) {
-	rh.mu.Lock()
-	defer rh.mu.Unlock()
-	rh.channels = append(rh.channels, ch)
-}
-
-func (rh *replicaHub) removeChannel(ch chan Serializeable) {
-	rh.mu.Lock()
-	defer rh.mu.Unlock()
-	rh.channels = slices.DeleteFunc(rh.channels, func(c chan Serializeable) bool {
-		return c == ch
-	})
-}
-
-func (rh *replicaHub) publish(v Serializeable) {
-	rh.mu.Lock()
-	defer rh.mu.Unlock()
-
-	for _, ch := range rh.channels {
-		ch <- v
-	}
-}
 
 func parseRequest(reader *ConnRW) chan resp.RESPValue {
 	out := make(chan resp.RESPValue)
@@ -84,7 +52,7 @@ func parseRequest(reader *ConnRW) chan resp.RESPValue {
 	return out
 }
 
-func clientLoop(rw *ConnRW, connStatus *cmd.ConnStatus, db *db.Database, rh *replicaHub) {
+func clientLoop(rw *ConnRW, connStatus *cmd.ConnStatus, db *db.Database, rh *repl.Hub) {
 	var err error
 	for respRequest := range parseRequest(rw) {
 		if err != nil {
@@ -98,7 +66,9 @@ func clientLoop(rw *ConnRW, connStatus *cmd.ConnStatus, db *db.Database, rh *rep
 			continue
 		}
 
-		response := cmd.GenerateResponse(command, db, connStatus)
+		response := cmd.GenerateResponse(command, db, connStatus, rh)
+
+		// replica should reply to master only in specific case
 		if !connStatus.IsReplica() || slices.Contains(REPLICA_COMMANDS, strings.ToUpper(command.Name)) {
 			_, err = rw.Write(response.Serialize())
 			if err != nil {
@@ -106,34 +76,35 @@ func clientLoop(rw *ConnRW, connStatus *cmd.ConnStatus, db *db.Database, rh *rep
 				continue
 			}
 		}
+		// replica connection with master
+		if connStatus.IsReplica() && connStatus.IsReplicated() {
+			db.AddReplicaOffset(respRequest.Serialize())
+
+		}
+
+		// master only
 		// send command to all of the replicas channels
 		if db.IsMaster() {
 			if slices.Contains(WRITE_COMMANDS, strings.ToUpper(command.Name)) {
-				rh.publish(respRequest)
+				db.AddReplicaOffset(respRequest.Serialize())
+				rh.Publish(respRequest)
 			}
 		}
-
 		// Master exit the client loop and replicate
 		if connStatus.ShouldRepeplicate() {
 			return // break client loop - connection becomes replica connection
 		}
 
-		// replica connection with master
-		if connStatus.IsReplica() && connStatus.IsReplicated() {
-			n := len(respRequest.Serialize())
-			db.AddReplicaOffset(n)
-
-		}
 	}
 }
 
-func replicaLoop(w *ConnRW, connStatus *cmd.ConnStatus, rh *replicaHub) {
+func replicaLoop(w *ConnRW, connStatus *cmd.ConnStatus, rh *repl.Hub) {
 	if _, err := w.Write(rdb.RDB{}.Serialize()); err != nil {
 		return
 	}
-	ch := make(chan Serializeable, 16)
-	rh.addChannel(ch)
-	defer rh.removeChannel(ch)
+	ch := make(chan repl.Serializeable, 16)
+	rh.AddChannel(ch)
+	defer rh.RemoveChannel(ch)
 	defer close(ch)
 	for data := range ch {
 		// write channel commands to appropriate replica
@@ -144,7 +115,7 @@ func replicaLoop(w *ConnRW, connStatus *cmd.ConnStatus, rh *replicaHub) {
 	}
 }
 
-func handlClientConn(connection net.Conn, db *db.Database, connStatus *cmd.ConnStatus, rh *replicaHub) {
+func handlClientConn(connection net.Conn, db *db.Database, connStatus *cmd.ConnStatus, rh *repl.Hub) {
 	defer connection.Close()
 	rw := NewConnRW(connection)
 
@@ -161,7 +132,7 @@ func OpenClient(appConfig *config.Config, database *db.Database) error {
 	if err != nil {
 		return err
 	}
-	replicaHub := replicaHub{}
+	replicaHub := repl.Hub{}
 	for {
 		conn, err := l.Accept()
 		connStatus := cmd.NewConnStatus()
@@ -200,7 +171,7 @@ func OpenReplica(appConfig *config.Config, database *db.Database) error {
 	connStatus.MarkReplicated() // replica cannot be replicated further down
 	connStatus.MarkAsReplica()
 
-	replicaHub := replicaHub{}
+	replicaHub := repl.Hub{}
 	go clientLoop(&rw, &connStatus, database, &replicaHub)
 	return nil
 }
