@@ -9,6 +9,7 @@ import (
 
 	"github.com/codecrafters-io/redis-starter-go/app/db"
 	"github.com/codecrafters-io/redis-starter-go/app/repl"
+	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
 func Info(command Command, database *db.Database) string {
@@ -26,12 +27,17 @@ func Info(command Command, database *db.Database) string {
 
 }
 
-func replconf(command Command, database *db.Database) ([]string, error) {
+func replconf(command Command, database *db.Database, cs *ConnStatus, hub *repl.Hub) ([]string, error) {
 	args := command.Args
 	if len(args) < 2 {
 		return nil, errors.New("not enought args")
 	}
 	if strings.ToUpper(args[0]) == "LISTENING-PORT" {
+		port, err := strconv.Atoi(args[1])
+		if err != nil {
+			return nil, err
+		}
+		cs.SetPort(port)
 		return []string{"OK"}, nil
 	}
 	if strings.ToUpper(args[0]) == "CAPA" {
@@ -44,6 +50,15 @@ func replconf(command Command, database *db.Database) ([]string, error) {
 			strconv.Itoa(database.GetReplica().GetOffset()),
 		}, nil
 	}
+	if strings.ToUpper(args[0]) == "ACK" {
+		ack, err := strconv.Atoi(args[1])
+		if err != nil {
+			return nil, err
+		}
+		hub.SetAck(cs.GetPort(), ack)
+		return nil, nil
+
+	}
 	return nil, fmt.Errorf("unknown args: %s", args)
 
 }
@@ -53,8 +68,13 @@ func wait(command Command, database *db.Database, rh *repl.Hub) (int, error) {
 	if len(args) < 2 {
 		return 0, errors.New("not enought args")
 	}
-	timeout := args[1]
-	timeoutMs, err := strconv.Atoi(timeout)
+
+	timeoutMs, err := strconv.Atoi(args[1])
+	if err != nil {
+		return 0, err
+	}
+
+	requiredNr, err := strconv.Atoi(args[1])
 	if err != nil {
 		return 0, err
 	}
@@ -63,14 +83,25 @@ func wait(command Command, database *db.Database, rh *repl.Hub) (int, error) {
 		return rh.NumberOfReplica(), nil
 	}
 	start := time.Now()
-	for {
-		end := time.Now()
-		time.Sleep(500 * time.Microsecond)
 
-		if end.Sub(start).Milliseconds() > int64(timeoutMs) {
-			return 0, errors.New("timeout")
+	curreentOffset := database.GetReplica().GetOffset()
+	cmd := resp.NewArray([]string{"REPLCONF", "GETACK", "*"})
+	rh.Publish(cmd)
+	for {
+		cnt := 0
+		for _, v := range rh.GetAck() {
+			if v >= curreentOffset {
+				cnt += 1
+			}
 		}
-		break
+		if cnt >= requiredNr {
+			return cnt, nil
+		}
+
+		end := time.Now()
+		if end.Sub(start).Milliseconds() > int64(timeoutMs) {
+			return cnt, nil
+		}
+		time.Sleep(100 * time.Microsecond)
 	}
-	return 0, nil
 }

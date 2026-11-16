@@ -250,16 +250,17 @@ func GenerateResponse(
 		}
 	case "REPLCONF":
 		{
-			data, err := replconf(command, database)
+			data, err := replconf(command, database, connState, rh)
 			if err != nil {
 				response = resp.SimpleError{Data: err.Error()}
+			} else if data == nil {
+				response = nil
+			} else if len(data) == 1 {
+				response = resp.SimpleString{Data: []byte(data[0])}
 			} else {
-				if len(data) == 1 {
-					response = resp.SimpleString{Data: []byte(data[0])}
-				} else {
-					response = resp.NewArray(data)
-				}
+				response = resp.NewArray(data)
 			}
+
 		}
 	case "PSYNC":
 		{

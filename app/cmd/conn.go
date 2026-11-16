@@ -17,6 +17,7 @@ type ConnStatus struct {
 	watching     map[string]time.Time
 	isReplica    bool
 	isReplicated bool
+	replicaPort  int
 }
 
 func NewConnStatus() ConnStatus {
@@ -25,7 +26,9 @@ func NewConnStatus() ConnStatus {
 		transaction:  false,
 		watching:     watching,
 		isReplica:    false,
-		isReplicated: false}
+		isReplicated: false,
+		replicaPort:  -1,
+	}
 }
 
 func (cs *ConnStatus) QueueCommand(command Command) bool {
@@ -134,4 +137,12 @@ func (cs *ConnStatus) Watch(cmd Command, database *db.Database) error {
 
 func (cs *ConnStatus) Unwatch() {
 	clear(cs.watching)
+}
+
+func (cs *ConnStatus) SetPort(port int) {
+	cs.replicaPort = port
+}
+
+func (cs *ConnStatus) GetPort() int {
+	return cs.replicaPort
 }

@@ -8,35 +8,54 @@ import (
 type Hub struct {
 	mu       sync.Mutex
 	channels []chan Serializeable
+	acks     map[int]int
+}
+
+func NewHub() Hub {
+	acks := make(map[int]int)
+	channels := make([]chan Serializeable, 0)
+	return Hub{channels: channels, acks: acks}
 }
 
 type Serializeable interface {
 	Serialize() []byte
 }
 
-func (rh *Hub) AddChannel(ch chan Serializeable) {
-	rh.mu.Lock()
-	defer rh.mu.Unlock()
-	rh.channels = append(rh.channels, ch)
+func (h *Hub) AddChannel(ch chan Serializeable) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.channels = append(h.channels, ch)
 }
 
-func (rh *Hub) RemoveChannel(ch chan Serializeable) {
-	rh.mu.Lock()
-	defer rh.mu.Unlock()
-	rh.channels = slices.DeleteFunc(rh.channels, func(c chan Serializeable) bool {
+func (h *Hub) RemoveChannel(ch chan Serializeable) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.channels = slices.DeleteFunc(h.channels, func(c chan Serializeable) bool {
 		return c == ch
 	})
 }
 
-func (rh *Hub) Publish(v Serializeable) {
-	rh.mu.Lock()
-	defer rh.mu.Unlock()
+func (h *Hub) Publish(v Serializeable) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 
-	for _, ch := range rh.channels {
+	for _, ch := range h.channels {
 		ch <- v
 	}
 }
 
-func (rh *Hub) NumberOfReplica() int {
-	return len(rh.channels)
+func (h *Hub) NumberOfReplica() int {
+	return len(h.channels)
+}
+
+func (h *Hub) SetAck(port, offset int) {
+	h.mu.Lock()
+	h.acks[port] = offset
+	h.mu.Unlock()
+}
+
+func (h *Hub) GetAck() map[int]int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.acks
 }
