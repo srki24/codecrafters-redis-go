@@ -276,6 +276,15 @@ func GenerateResponse(
 				response = resp.Integer{Data: data}
 			}
 		}
+	case "CONFIG":
+		{
+			if data, err := ConfigGet(command, database); err != nil {
+				response = resp.SimpleError{Data: err.Error()}
+			} else {
+				response = resp.NewArray(data)
+			}
+
+		}
 
 	default:
 		response = resp.SimpleError{Data: fmt.Sprintf("uknown command: %s", command.Name)}

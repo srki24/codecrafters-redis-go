@@ -7,8 +7,10 @@ import (
 )
 
 type Config struct {
-	Port      int
-	ReplicaOf string
+	Port       int
+	ReplicaOf  string
+	Dir        string
+	DbFilename string
 }
 
 func (c *Config) ParseReplica() (host, port string, err error) {
@@ -32,5 +34,7 @@ func (c *Config) IsReplica() bool {
 func ParseInto(config *Config) {
 	flag.IntVar(&config.Port, "port", 6379, "Port to start the server on")
 	flag.StringVar(&config.ReplicaOf, "replicaof", "", "Start Redis server as a replica")
+	flag.StringVar(&config.Dir, "dir", "", "Directory where RBD file is stored")
+	flag.StringVar(&config.DbFilename, "dbfilename", "", "RDB filename")
 	flag.Parse()
 }

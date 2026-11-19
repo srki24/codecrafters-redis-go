@@ -43,6 +43,7 @@ type Database struct {
 	data    map[string]Data
 	mu      sync.RWMutex
 	replica Replica
+	cfg     *config.Config
 }
 
 func (db *Database) get(key string) (Data, bool) {
@@ -88,7 +89,12 @@ func (db *Database) AddReplicaOffset(request []byte) {
 func NewDatabase(config *config.Config) Database {
 	data := make(map[string]Data)
 	replica := newReplica(config)
-	return Database{data: data, replica: replica}
+
+	return Database{data: data, replica: replica, cfg: config}
+}
+
+func (db *Database) GetConfig() *config.Config {
+	return db.cfg
 }
 
 func Update[T any](
