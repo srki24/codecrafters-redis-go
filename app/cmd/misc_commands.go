@@ -38,7 +38,7 @@ func ConfigGet(command Command, database *db.Database) (out []string, err error)
 			out = append(out, dir...)
 		} else if strings.ToLower(arg) == "dbfilename" {
 			filename := []string{arg, database.GetConfig().DbFilename}
-			out = append(filename)
+			out = append(out, filename...)
 		} else {
 			return out, fmt.Errorf("Unknown arg %s", arg)
 		}
