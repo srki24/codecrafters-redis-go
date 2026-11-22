@@ -38,7 +38,7 @@ func Set(command Command, database *db.Database) error {
 			return errors.New("Unknown option")
 		}
 	}
-	database.Set(key, db.Data{Value: value, CreatedTime: time.Now(), Exp: exp})
+	database.Set(key, db.Data{Value: value, CreatedTime: time.Now(), ExpMS: exp})
 	return nil
 }
 

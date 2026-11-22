@@ -13,7 +13,7 @@ type Data struct {
 	Value       DbValue
 	CreatedTime time.Time
 	UpdatedTime time.Time
-	Exp         int
+	ExpMS       int
 }
 
 func NewData(value DbValue, exp *int) Data {
@@ -26,17 +26,17 @@ func NewData(value DbValue, exp *int) Data {
 	return Data{Value: value,
 		CreatedTime: now,
 		UpdatedTime: now,
-		Exp:         *exp,
+		ExpMS:       *exp,
 	}
 }
 
 func (d Data) Expired() bool {
-	if d.Exp <= 0 {
+	if d.ExpMS <= 0 {
 		return false
 	}
 	cTime := time.Now()
 	elapsed := int(cTime.Sub(d.CreatedTime).Milliseconds())
-	return elapsed > d.Exp
+	return elapsed > d.ExpMS
 }
 
 // Database

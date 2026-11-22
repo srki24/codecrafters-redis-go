@@ -104,7 +104,7 @@ func Xadd(cmd Command, database *db.Database) (string, error) {
 			data := db.Data{
 				Value:       stream,
 				CreatedTime: time.Now(),
-				Exp:         -1,
+				ExpMS:       -1,
 			}
 			return data, entryId.String(), nil
 		}

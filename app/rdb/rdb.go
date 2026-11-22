@@ -53,6 +53,7 @@ func Load(db *db.Database, dir, filename string) error {
 
 func apply(database *db.Database, data []byte) error {
 	i := 0
+	exp := -1
 	if err := consumeHeader(&i, data); err != nil {
 		return err
 	}
@@ -82,6 +83,27 @@ func apply(database *db.Database, data []byte) error {
 			if _, _, err := readLen(&i, data); err != nil {
 				return err
 			}
+		case RDBEXPIRETIME:
+			t := time.Unix(int64(binary.LittleEndian.Uint64(data[i:i+4])), 0)
+			i += 4
+			rem := int(time.Until(t).Milliseconds())
+			if rem <= 0 {
+				continue
+			}
+			exp = rem
+
+		case RDBEXPIRETIMEMS:
+			t := time.UnixMilli(int64(binary.LittleEndian.Uint64(data[i : i+8])))
+			fmt.Printf("%08b", data[i:i+8])
+			i += 8
+			rem := int(time.Until(t).Milliseconds())
+			if rem <= 0 {
+				continue
+			}
+			exp = rem
+			fmt.Println(t)
+			fmt.Println(exp)
+
 		case RDBSTRING:
 			key, err := readStr(&i, data)
 			if err != nil {
@@ -92,7 +114,11 @@ func apply(database *db.Database, data []byte) error {
 				return err
 			}
 			dbValue := db.StringType(value)
-			database.Set(key, db.Data{Value: dbValue, CreatedTime: time.Now(), Exp: -1})
+			database.Set(key, db.Data{
+				Value:       dbValue,
+				CreatedTime: time.Now(),
+				ExpMS:       exp})
+			exp = -1
 		case RDBEOF:
 			return nil
 
