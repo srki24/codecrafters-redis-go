@@ -93,3 +93,11 @@ func Incr(command Command, database *db.Database) (int, error) {
 	return out, nil
 
 }
+
+func GetKeys(command Command, database *db.Database) ([]string, error) {
+	args := command.Args
+	if len(args) < 1 {
+		return nil, errors.New("failed to get KEYS, not enough args")
+	}
+	return database.GetKeys(args[0])
+}

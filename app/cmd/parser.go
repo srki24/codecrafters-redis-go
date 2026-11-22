@@ -160,130 +160,110 @@ func GenerateResponse(
 			response = resp.NewArrayFromStream(data)
 		}
 	case "XREAD":
-		{
-			keys, streams, err := Xread(command, database)
-			if err != nil {
-				if errors.Is(err, ErrNotFound) {
-					response = resp.NewArray([]string{})
-				} else {
-					response = resp.SimpleError{Data: err.Error()}
-				}
+		keys, streams, err := Xread(command, database)
+		if err != nil {
+			if errors.Is(err, ErrNotFound) {
+				response = resp.NewArray([]string{})
 			} else {
-				streamResponses := []resp.RESPValue{}
-				for i := 0; i < len(keys); i++ {
-					key := keys[i]
-					stream := streams[i]
-					streamKey := resp.BulkString{Data: []byte(key)}
-					streamValue := resp.NewArrayFromStream(stream)
-					streamResponses = append(
-						streamResponses,
-						resp.Array{Data: []resp.RESPValue{streamKey, streamValue}})
-				}
-				if len(streamResponses) == 0 {
-					response = resp.NewNullArray()
-				} else {
-					response = resp.Array{Data: streamResponses}
-				}
+				response = resp.SimpleError{Data: err.Error()}
+			}
+		} else {
+			streamResponses := []resp.RESPValue{}
+			for i := 0; i < len(keys); i++ {
+				key := keys[i]
+				stream := streams[i]
+				streamKey := resp.BulkString{Data: []byte(key)}
+				streamValue := resp.NewArrayFromStream(stream)
+				streamResponses = append(
+					streamResponses,
+					resp.Array{Data: []resp.RESPValue{streamKey, streamValue}})
+			}
+			if len(streamResponses) == 0 {
+				response = resp.NewNullArray()
+			} else {
+				response = resp.Array{Data: streamResponses}
 			}
 		}
 	case "INCR":
-		{
-			val, err := Incr(command, database)
-			if err != nil {
-				response = resp.SimpleError{Data: err.Error()}
-			} else {
-				response = resp.Integer{Data: val}
-			}
+		val, err := Incr(command, database)
+		if err != nil {
+			response = resp.SimpleError{Data: err.Error()}
+		} else {
+			response = resp.Integer{Data: val}
 		}
 	case "MULTI":
-		{
-			connState.BeginTransaction()
-			response = resp.SimpleString{Data: []byte("OK")}
-		}
+		connState.BeginTransaction()
+		response = resp.SimpleString{Data: []byte("OK")}
 	case "EXEC":
-		{
-			if connState.ShouldAbort(database) {
-				response = resp.NewNullArray()
-				connState.EndTransaction()
-			} else {
+		if connState.ShouldAbort(database) {
+			response = resp.NewNullArray()
+			connState.EndTransaction()
+		} else {
 
-				err, queue := connState.Exec(database)
-				if err != nil {
-					response = resp.SimpleError{Data: err.Error()}
-				} else {
-
-					var responses []resp.RESPValue
-					for _, cmd := range queue {
-						r := GenerateResponse(cmd, database, connState, rh)
-						responses = append(responses, r)
-					}
-					response = resp.Array{Data: responses}
-				}
-			}
-
-		}
-	case "DISCARD":
-		{
-			if err := connState.Discard(); err != nil {
-				response = resp.SimpleError{Data: err.Error()}
-			} else {
-				response = resp.SimpleString{Data: []byte("OK")}
-			}
-		}
-	case "WATCH":
-		{
-			if err := connState.Watch(command, database); err != nil {
-				response = resp.SimpleError{Data: err.Error()}
-			} else {
-				response = resp.SimpleString{Data: []byte("OK")}
-			}
-		}
-	case "UNWATCH":
-		{
-			connState.Unwatch()
-			response = resp.SimpleString{Data: []byte("OK")}
-		}
-	case "INFO":
-		{
-			data := Info(command, database)
-			response = resp.BulkString{Data: []byte(data)}
-		}
-	case "REPLCONF":
-		{
-			data, err := replconf(command, database, connState, rh)
+			err, queue := connState.Exec(database)
 			if err != nil {
 				response = resp.SimpleError{Data: err.Error()}
-			} else if data == nil {
-				response = nil
-			} else if len(data) == 1 {
-				response = resp.SimpleString{Data: []byte(data[0])}
 			} else {
-				response = resp.NewArray(data)
-			}
 
+				var responses []resp.RESPValue
+				for _, cmd := range queue {
+					r := GenerateResponse(cmd, database, connState, rh)
+					responses = append(responses, r)
+				}
+				response = resp.Array{Data: responses}
+			}
+		}
+	case "DISCARD":
+		if err := connState.Discard(); err != nil {
+			response = resp.SimpleError{Data: err.Error()}
+		} else {
+			response = resp.SimpleString{Data: []byte("OK")}
+		}
+	case "WATCH":
+		if err := connState.Watch(command, database); err != nil {
+			response = resp.SimpleError{Data: err.Error()}
+		} else {
+			response = resp.SimpleString{Data: []byte("OK")}
+		}
+	case "UNWATCH":
+		connState.Unwatch()
+		response = resp.SimpleString{Data: []byte("OK")}
+	case "INFO":
+		data := Info(command, database)
+		response = resp.BulkString{Data: []byte(data)}
+	case "REPLCONF":
+		data, err := replconf(command, database, connState, rh)
+		if err != nil {
+			response = resp.SimpleError{Data: err.Error()}
+		} else if data == nil {
+			response = nil
+		} else if len(data) == 1 {
+			response = resp.SimpleString{Data: []byte(data[0])}
+		} else {
+			response = resp.NewArray(data)
 		}
 	case "PSYNC":
-		{
-			data := fmt.Sprintf("FULLRESYNC %s 0", database.GetReplica().Id())
-			response = resp.SimpleString{Data: []byte(data)}
-			connState.MarkAsReplica()
-		}
+		data := fmt.Sprintf("FULLRESYNC %s 0", database.GetReplica().Id())
+		response = resp.SimpleString{Data: []byte(data)}
+		connState.MarkAsReplica()
 	case "WAIT":
-		{
-			if data, err := wait(command, database, rh); err != nil {
-				response = resp.SimpleError{Data: err.Error()}
-			} else {
-				response = resp.Integer{Data: data}
-			}
+		if data, err := wait(command, database, rh); err != nil {
+			response = resp.SimpleError{Data: err.Error()}
+		} else {
+			response = resp.Integer{Data: data}
 		}
 	case "CONFIG":
-		{
-			if data, err := ConfigGet(command, database); err != nil {
-				response = resp.SimpleError{Data: err.Error()}
-			} else {
-				response = resp.NewArray(data)
-			}
+		if data, err := ConfigGet(command, database); err != nil {
+			response = resp.SimpleError{Data: err.Error()}
+		} else {
+			response = resp.NewArray(data)
+		}
 
+	case "KEYS":
+		if data, err := GetKeys(command, database); err != nil {
+			response = resp.SimpleError{Data: err.Error()}
+		} else {
+			response = resp.NewArray(data)
 		}
 
 	default:

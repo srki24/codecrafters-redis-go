@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"path"
 	"sync"
 	"time"
 
@@ -61,6 +62,23 @@ func (db *Database) Get(key string) (Data, bool) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 	return db.get(key)
+}
+
+func (db *Database) GetKeys(pattern string) ([]string, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+	var out []string
+
+	for key := range db.data {
+		if matched, err := path.Match(pattern, key); matched {
+			if err != nil {
+				return out, err
+			}
+			out = append(out, key)
+		}
+
+	}
+	return out, nil
 }
 
 func (db *Database) Set(key string, value Data) {

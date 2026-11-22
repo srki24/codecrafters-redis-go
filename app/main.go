@@ -7,6 +7,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/config"
 	"github.com/codecrafters-io/redis-starter-go/app/connection"
 	"github.com/codecrafters-io/redis-starter-go/app/db"
+	"github.com/codecrafters-io/redis-starter-go/app/rdb"
 )
 
 var AppConfig config.Config
@@ -16,6 +17,10 @@ func main() {
 
 	db := db.NewDatabase(&AppConfig)
 
+	if err := rdb.Load(&db, AppConfig.Dir, AppConfig.DbFilename); err != nil {
+		log.Printf("failed to load RDB file: %v", err)
+		os.Exit(1)
+	}
 	// replication mode
 	if AppConfig.IsReplica() {
 		go func() {
