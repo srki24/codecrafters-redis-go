@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/codecrafters-io/redis-starter-go/app/aof"
 	"github.com/codecrafters-io/redis-starter-go/app/cmd"
 	"github.com/codecrafters-io/redis-starter-go/app/config"
 	"github.com/codecrafters-io/redis-starter-go/app/db"
@@ -85,10 +86,13 @@ func clientLoop(rw *ConnRW, connStatus *cmd.ConnStatus, db *db.Database, rh *rep
 
 		}
 
-		// master only
-		// send command to all of the replicas channels
-		if db.IsMaster() {
-			if slices.Contains(WRITE_COMMANDS, strings.ToUpper(command.Name)) {
+		// write commands
+		if slices.Contains(WRITE_COMMANDS, strings.ToUpper(command.Name)) {
+			err = aof.WriteCommanand(respRequest.Serialize())
+
+			// master only
+			// send command to all of the replicas channels
+			if db.IsMaster() {
 				db.AddReplicaOffset(respRequest.Serialize())
 				rh.Publish(respRequest)
 			}
