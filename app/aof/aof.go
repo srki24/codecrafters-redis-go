@@ -95,6 +95,7 @@ func getAOFfromManifest() (string, error) {
 	return aofFile, nil
 
 }
+
 func WriteCommanand(data []byte) error {
 	if strings.ToLower(appendOnly) != "yes" {
 		return nil
@@ -105,9 +106,16 @@ func WriteCommanand(data []byte) error {
 		fmt.Println(err)
 		return err
 	}
-	return os.WriteFile(
+	f, err := os.OpenFile(
 		path.Join(dir, aofFile),
-		data,
-		os.ModeAppend,
+		os.O_APPEND|os.O_WRONLY,
+		filePerm,
 	)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	_, err = f.Write(data)
+	return err
 }
