@@ -31,13 +31,28 @@ func ConfigGet(command Command, database *db.Database) (out []string, err error)
 	if args[0] != "GET" {
 		return out, fmt.Errorf("Unknown arg %s, expected GET", args[0])
 	}
-
+	config := database.GetConfig()
 	for _, arg := range args[1:] {
 		if strings.ToLower(arg) == "dir" {
-			dir := []string{arg, database.GetConfig().Dir}
+			dir := []string{arg, config.Dir}
 			out = append(out, dir...)
 		} else if strings.ToLower(arg) == "dbfilename" {
-			filename := []string{arg, database.GetConfig().DbFilename}
+			filename := []string{arg, config.Dir}
+			out = append(out, filename...)
+		} else if strings.ToLower(arg) == "dbfilename" {
+			filename := []string{arg, config.Dir}
+			out = append(out, filename...)
+		} else if strings.ToLower(arg) == "appendonly" {
+			filename := []string{arg, config.AppendOnly}
+			out = append(out, filename...)
+		} else if strings.ToLower(arg) == "appenddirname" {
+			filename := []string{arg, config.AppendDirName}
+			out = append(out, filename...)
+		} else if strings.ToLower(arg) == "appendfilename" {
+			filename := []string{arg, config.AppendFileName}
+			out = append(out, filename...)
+		} else if strings.ToLower(arg) == "appendfsync" {
+			filename := []string{arg, config.AppendFSync}
 			out = append(out, filename...)
 		} else {
 			return out, fmt.Errorf("Unknown arg %s", arg)
