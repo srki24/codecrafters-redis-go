@@ -30,12 +30,15 @@ func InitializeAOF(config *config.Config) error {
 		config.AppendFileName,
 		strconv.Itoa(version),
 		"incr",
-		"aof",
 	}, ".")
-	if _, err := os.OpenFile(
-		path.Join(dir, filename),
-		os.O_CREATE,
-		filePerm); err != nil {
+	aofFilenme := filename + "." + "aof"
+
+	if _, err := os.Create(path.Join(dir, aofFilenme)); err != nil {
+		return err
+	}
+
+	manifestFilename := filename + "." + "manifest"
+	if _, err := os.Create(path.Join(dir, manifestFilename)); err != nil {
 		return err
 	}
 	return nil
