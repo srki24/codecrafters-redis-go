@@ -15,7 +15,7 @@ const (
 	filePerm fs.FileMode = 0644
 )
 
-var version int = 0
+var version int = 1
 
 func InitializeAOF(config *config.Config) error {
 	if config.AppendOnly == "no" {
@@ -30,9 +30,12 @@ func InitializeAOF(config *config.Config) error {
 		config.AppendFileName,
 		strconv.Itoa(version),
 		"incr",
+		"aof",
 	}, ".")
-
-	if _, err := os.Create(path.Join(dir, filename)); err != nil {
+	if _, err := os.OpenFile(
+		path.Join(dir, filename),
+		os.O_CREATE,
+		filePerm); err != nil {
 		return err
 	}
 	return nil
