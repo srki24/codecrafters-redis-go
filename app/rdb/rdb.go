@@ -51,9 +51,13 @@ func Load(db *db.Database, dir, filename string) error {
 	return apply(db, data)
 }
 
+func calcExpFromTime(t time.Time) int {
+	return int(time.Until(t).Milliseconds())
+}
+
 func apply(database *db.Database, data []byte) error {
+	var exp int = -1
 	i := 0
-	exp := -1
 	if err := consumeHeader(&i, data); err != nil {
 		return err
 	}
@@ -86,24 +90,12 @@ func apply(database *db.Database, data []byte) error {
 		case RDBEXPIRETIME:
 			t := time.Unix(int64(binary.LittleEndian.Uint64(data[i:i+4])), 0)
 			i += 4
-			rem := int(time.Until(t).Milliseconds())
-			if rem <= 0 {
-				continue
-			}
-			exp = rem
+			exp = calcExpFromTime(t)
 
 		case RDBEXPIRETIMEMS:
 			t := time.UnixMilli(int64(binary.LittleEndian.Uint64(data[i : i+8])))
-			fmt.Printf("%08b", data[i:i+8])
 			i += 8
-			rem := int(time.Until(t).Milliseconds())
-			if rem <= 0 {
-				continue
-			}
-			exp = rem
-			fmt.Println(t)
-			fmt.Println(exp)
-
+			exp = calcExpFromTime(t)
 		case RDBSTRING:
 			key, err := readStr(&i, data)
 			if err != nil {
@@ -114,10 +106,12 @@ func apply(database *db.Database, data []byte) error {
 				return err
 			}
 			dbValue := db.StringType(value)
-			database.Set(key, db.Data{
-				Value:       dbValue,
-				CreatedTime: time.Now(),
-				ExpMS:       exp})
+			fmt.Println(exp)
+			if exp < -1 { // skip, already expired
+				exp = -1
+				continue
+			}
+			database.Set(key, db.NewData(dbValue, &exp))
 			exp = -1
 		case RDBEOF:
 			return nil
