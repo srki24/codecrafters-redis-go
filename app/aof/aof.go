@@ -1,6 +1,7 @@
 package aof
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"path"
@@ -26,19 +27,24 @@ func InitializeAOF(config *config.Config) error {
 	if err := os.MkdirAll(dir, dirPerm); err != nil {
 		return err
 	}
-	filename := strings.Join([]string{
+	aofFilename := strings.Join([]string{
 		config.AppendFileName,
 		strconv.Itoa(version),
 		"incr",
+		"aof",
 	}, ".")
-	aofFilenme := filename + "." + "aof"
 
-	if _, err := os.Create(path.Join(dir, aofFilenme)); err != nil {
+	if _, err := os.Create(path.Join(dir, aofFilename)); err != nil {
 		return err
 	}
 
-	manifestFilename := filename + "." + "manifest"
-	if _, err := os.Create(path.Join(dir, manifestFilename)); err != nil {
+	manifestFilename := config.AppendFileName + "." + "manifest"
+	manifestData := fmt.Appendf(nil, "file %s seq %d type %s", aofFilename, 1, "i")
+	if err := os.WriteFile(
+		path.Join(dir, manifestFilename),
+		manifestData,
+		filePerm,
+	); err != nil {
 		return err
 	}
 	return nil
