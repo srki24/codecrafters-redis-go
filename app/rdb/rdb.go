@@ -88,7 +88,7 @@ func apply(database *db.Database, data []byte) error {
 				return err
 			}
 		case RDBEXPIRETIME:
-			t := time.Unix(int64(binary.LittleEndian.Uint64(data[i:i+4])), 0)
+			t := time.Unix(int64(binary.LittleEndian.Uint32(data[i:i+4])), 0)
 			i += 4
 			exp = calcExpFromTime(t)
 
