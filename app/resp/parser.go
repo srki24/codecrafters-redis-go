@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"strconv"
 )
 
@@ -59,7 +60,7 @@ func parseArray(data []byte) (Array, int, error) {
 
 	consumeIdx := lenIdx + 2
 	for range nrElements {
-		dp, consumed, err := Parse(data[consumeIdx:])
+		dp, consumed, err := parse(data[consumeIdx:])
 
 		if err != nil {
 			return Array{}, 0, err
@@ -71,7 +72,7 @@ func parseArray(data []byte) (Array, int, error) {
 	return Array{Data: items}, consumeIdx, nil
 }
 
-func Parse(data []byte) (out RESPValue, consumed int, err error) {
+func parse(data []byte) (out RESPValue, consumed int, err error) {
 	if len(data) == 0 {
 		return nil, 0, ErrIncomplete
 	}
@@ -91,4 +92,35 @@ func Parse(data []byte) (out RESPValue, consumed int, err error) {
 	consumed++ // the type byte
 	return out, consumed, nil
 
+}
+
+func ParseRequest(reader io.Reader) chan RESPValue {
+	out := make(chan RESPValue)
+	go func() {
+		defer close(out)
+		var pending []byte
+		tmp := make([]byte, 4096)
+
+		for {
+			n, err := reader.Read(tmp)
+			if err != nil {
+				return
+			}
+			if n > 0 {
+				pending = append(pending, tmp[:n]...)
+			}
+			for len(pending) > 0 {
+				request, consumed, perr := parse(pending)
+				if errors.Is(perr, ErrIncomplete) {
+					break // partial read
+				}
+				if perr != nil {
+					return
+				}
+				out <- request
+				pending = pending[consumed:]
+			}
+		}
+	}()
+	return out
 }

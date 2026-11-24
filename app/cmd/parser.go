@@ -66,9 +66,12 @@ func GenerateResponse(
 	database *db.Database,
 	connState *ConnStatus,
 	rh *repl.Hub) (response resp.RESPValue) {
-	if ok := connState.QueueCommand(command); ok {
-		response = resp.SimpleString{Data: []byte("QUEUED")}
-		return
+
+	if connState != nil {
+		if ok := connState.QueueCommand(command); ok {
+			response = resp.SimpleString{Data: []byte("QUEUED")}
+			return
+		}
 	}
 	switch strings.ToUpper(command.Name) {
 	case "ECHO":

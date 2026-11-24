@@ -22,41 +22,10 @@ import (
 var WRITE_COMMANDS = []string{"SET", "DEL", "INCR", "RPUSH", "LPUSH", "LPOP", "RPOP", "BLPOP", "BRPOP", "XADD", "EXEC", "MULTI"}
 var REPLICA_COMMANDS = []string{"INFO", "REPLCONF", "PSYNC"}
 
-func parseRequest(reader *ConnRW) chan resp.RESPValue {
-	out := make(chan resp.RESPValue)
-	go func() {
-		defer close(out)
-		var pending []byte
-		tmp := make([]byte, 4096)
-
-		for {
-			n, err := reader.Read(tmp)
-			if err != nil {
-				return
-			}
-			if n > 0 {
-				pending = append(pending, tmp[:n]...)
-			}
-			for len(pending) > 0 {
-				request, consumed, perr := resp.Parse(pending)
-				if errors.Is(perr, resp.ErrIncomplete) {
-					break // partial read
-				}
-				if perr != nil {
-					return
-				}
-				out <- request
-				pending = pending[consumed:]
-			}
-		}
-	}()
-	return out
-}
-
 func clientLoop(rw *ConnRW, connStatus *cmd.ConnStatus, db *db.Database, rh *repl.Hub) {
 	var err error
 	var writting bool = false
-	for respRequest := range parseRequest(rw) {
+	for respRequest := range resp.ParseRequest(rw) {
 		if err != nil {
 			rw.Write([]byte(err.Error()))
 			err = nil

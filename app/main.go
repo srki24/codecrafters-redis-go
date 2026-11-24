@@ -23,7 +23,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := aof.InitializeAOF(&AppConfig); err != nil {
+	if err := aof.InitializeAOF(&AppConfig, &db); err != nil {
 		log.Printf("failed to initilize AOF: %v", err)
 		os.Exit(1)
 	}
