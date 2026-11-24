@@ -59,8 +59,8 @@ func (db *Database) get(key string) (Data, bool) {
 }
 
 func (db *Database) Get(key string) (Data, bool) {
-	db.mu.RLock()
-	defer db.mu.RUnlock()
+	db.mu.Lock() //rw lock, get deletes expired key
+	defer db.mu.Unlock()
 	return db.get(key)
 }
 

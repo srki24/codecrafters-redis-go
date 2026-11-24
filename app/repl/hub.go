@@ -57,5 +57,10 @@ func (h *Hub) SetAck(port, offset int) {
 func (h *Hub) GetAck() map[int]int {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	return h.acks
+	// copy acks to keep them under a lock while counted.
+	out := make(map[int]int, len(h.acks))
+	for k, v := range h.acks {
+		out[k] = v
+	}
+	return out
 }
