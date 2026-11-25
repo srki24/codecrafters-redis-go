@@ -38,7 +38,6 @@ func (h *Hub) RemoveChannel(ch chan Serializeable) {
 func (h *Hub) Publish(v Serializeable) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-
 	for _, ch := range h.channels {
 		ch <- v
 	}

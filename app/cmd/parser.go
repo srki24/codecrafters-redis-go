@@ -268,7 +268,16 @@ func GenerateResponse(
 		} else {
 			response = resp.NewArray(data)
 		}
-
+	case "SUBSCRIBE":
+		if data, ch, err := Subscribe(command, connState); err != nil {
+			response = resp.SimpleError{Data: err.Error()}
+		} else {
+			response = resp.NewRespArray(
+				[]resp.RESPValue{
+					resp.BulkString{Data: []byte("subscribe")},
+					resp.BulkString{Data: []byte(ch)},
+					resp.Integer{Data: data}}...)
+		}
 	default:
 		response = resp.SimpleError{Data: fmt.Sprintf("uknown command: %s", command.Name)}
 	}

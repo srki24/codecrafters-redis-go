@@ -18,6 +18,7 @@ type ConnStatus struct {
 	isReplica    bool
 	isReplicated bool
 	replicaPort  int
+	subscribed   []string
 }
 
 func NewConnStatus() ConnStatus {
@@ -28,7 +29,24 @@ func NewConnStatus() ConnStatus {
 		isReplica:    false,
 		isReplicated: false,
 		replicaPort:  -1,
+		subscribed:   []string{},
 	}
+}
+
+func (cs *ConnStatus) Subscribe(ch string) {
+	cs.subscribed = append(cs.subscribed, ch)
+}
+
+func (cs *ConnStatus) Unsubscribe(ch string) {
+	cs.subscribed = slices.DeleteFunc(cs.subscribed, func(c string) bool { return c == ch })
+}
+
+func (cs *ConnStatus) IsSub() bool {
+	return cs.NumberOfSubscriptions() >= 1
+}
+
+func (cs *ConnStatus) NumberOfSubscriptions() int {
+	return len(cs.subscribed)
 }
 
 func (cs *ConnStatus) QueueCommand(command Command) bool {
