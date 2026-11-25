@@ -61,6 +61,37 @@ func ParseCommand(input resp.RESPValue) (Command, error) {
 	}
 }
 
+func GenerateSubResponse(
+	command Command,
+	connState *ConnStatus) (response resp.RESPValue) {
+
+	switch strings.ToUpper(command.Name) {
+
+	case "SUBSCRIBE":
+		if data, ch, err := Subscribe(command, connState); err != nil {
+			response = resp.SimpleError{Data: err.Error()}
+		} else {
+			response = resp.NewRespArray(
+				[]resp.RESPValue{
+					resp.BulkString{Data: []byte("subscribe")},
+					resp.BulkString{Data: []byte(ch)},
+					resp.Integer{Data: data}}...)
+		}
+	case "PING":
+		response = resp.NewArray([]string{"pong", ""})
+
+	default:
+		response = resp.SimpleError{Data: fmt.Sprintf("ERR Can't execute '%s': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context", command.Name)}
+	}
+
+	if errResp, ok := response.(resp.SimpleError); ok {
+		log.Println(errResp.String())
+		return
+	}
+	return
+
+}
+
 func GenerateResponse(
 	command Command,
 	database *db.Database,
@@ -269,15 +300,7 @@ func GenerateResponse(
 			response = resp.NewArray(data)
 		}
 	case "SUBSCRIBE":
-		if data, ch, err := Subscribe(command, connState); err != nil {
-			response = resp.SimpleError{Data: err.Error()}
-		} else {
-			response = resp.NewRespArray(
-				[]resp.RESPValue{
-					resp.BulkString{Data: []byte("subscribe")},
-					resp.BulkString{Data: []byte(ch)},
-					resp.Integer{Data: data}}...)
-		}
+		return GenerateSubResponse(command, connState)
 	default:
 		response = resp.SimpleError{Data: fmt.Sprintf("uknown command: %s", command.Name)}
 	}

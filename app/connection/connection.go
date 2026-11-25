@@ -25,6 +25,7 @@ var REPLICA_COMMANDS = []string{"INFO", "REPLCONF", "PSYNC"}
 func clientLoop(rw *ConnRW, connStatus *cmd.ConnStatus, db *db.Database, rh *repl.Hub) {
 	var err error
 	var writting bool = false
+	var response resp.RESPValue
 	for respRequest := range resp.ParseRequest(rw) {
 		if err != nil {
 			rw.Write([]byte(err.Error()))
@@ -37,7 +38,12 @@ func clientLoop(rw *ConnRW, connStatus *cmd.ConnStatus, db *db.Database, rh *rep
 			continue
 		}
 
-		response := cmd.GenerateResponse(command, db, connStatus, rh)
+		response = nil
+		if connStatus.IsSub() {
+			response = cmd.GenerateSubResponse(command, connStatus)
+		} else {
+			response = cmd.GenerateResponse(command, db, connStatus, rh)
+		}
 
 		// replica should reply to master only in specific case
 		if response != nil &&

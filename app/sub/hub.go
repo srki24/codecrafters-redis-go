@@ -4,5 +4,5 @@ import "sync"
 
 type Hub struct {
 	mu       sync.Mutex
-	channels []chan string
+	channels map[string][]chan string
 }
