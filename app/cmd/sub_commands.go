@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 
+	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/sub"
 )
 
@@ -23,11 +24,15 @@ func Publish(command Command, cs *ConnStatus, sh *sub.Hub) (int, error) {
 		return 0, errors.New("failed to publish, not enough args")
 	}
 	sub := args[0]
-	msg := args[1]
-	err := sh.Publish([]byte(msg), sub)
+	text := args[1]
+
+	msg := resp.NewArray([]string{"message", sub, text})
+
+	err := sh.Publish(msg.Serialize(), sub)
 	if err != nil {
 		return 0, err
 	}
+
 	return sh.NumberOfSubscribers(sub), nil
 
 }
