@@ -9,6 +9,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/db"
 	"github.com/codecrafters-io/redis-starter-go/app/repl"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
+	"github.com/codecrafters-io/redis-starter-go/app/sub"
 )
 
 type Command struct {
@@ -63,12 +64,12 @@ func ParseCommand(input resp.RESPValue) (Command, error) {
 
 func GenerateSubResponse(
 	command Command,
-	connState *ConnStatus) (response resp.RESPValue) {
-
+	connState *ConnStatus,
+	sh *sub.Hub,
+) (response resp.RESPValue) {
 	switch strings.ToUpper(command.Name) {
-
 	case "SUBSCRIBE":
-		if data, ch, err := Subscribe(command, connState); err != nil {
+		if data, ch, err := Subscribe(command, connState, sh); err != nil {
 			response = resp.SimpleError{Data: err.Error()}
 		} else {
 			response = resp.NewRespArray(
@@ -79,7 +80,22 @@ func GenerateSubResponse(
 		}
 	case "PING":
 		response = resp.NewArray([]string{"pong", ""})
-
+	case "PUBLISH":
+		if data, err := Publish(command, connState, sh); err != nil {
+			response = resp.SimpleError{Data: err.Error()}
+		} else {
+			response = resp.Integer{Data: data}
+		}
+	case "UNSUBSCRIBE":
+		if data, ch, err := Unsusbscribe(command, connState, sh); err != nil {
+			response = resp.SimpleError{Data: err.Error()}
+		} else {
+			response = resp.NewRespArray(
+				[]resp.RESPValue{
+					resp.BulkString{Data: []byte("unsubscribe")},
+					resp.BulkString{Data: []byte(ch)},
+					resp.Integer{Data: data}}...)
+		}
 	default:
 		response = resp.SimpleError{Data: fmt.Sprintf("ERR Can't execute '%s': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context", command.Name)}
 	}
@@ -299,10 +315,6 @@ func GenerateResponse(
 		} else {
 			response = resp.NewArray(data)
 		}
-	case "SUBSCRIBE":
-		return GenerateSubResponse(command, connState)
-	default:
-		response = resp.SimpleError{Data: fmt.Sprintf("uknown command: %s", command.Name)}
 	}
 
 	if errResp, ok := response.(resp.SimpleError); ok {

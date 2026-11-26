@@ -19,6 +19,7 @@ type ConnStatus struct {
 	isReplicated bool
 	replicaPort  int
 	subscribed   []string
+	outbound     chan []byte
 }
 
 func NewConnStatus() ConnStatus {
@@ -30,15 +31,24 @@ func NewConnStatus() ConnStatus {
 		isReplicated: false,
 		replicaPort:  -1,
 		subscribed:   []string{},
+		outbound:     nil,
 	}
 }
 
-func (cs *ConnStatus) Subscribe(ch string) {
-	cs.subscribed = append(cs.subscribed, ch)
+func (cs *ConnStatus) Outbound() chan []byte {
+	if cs.outbound == nil {
+		ch := make(chan []byte, 16)
+		cs.outbound = ch
+	}
+	return cs.outbound
+
+}
+func (cs *ConnStatus) Subscribe(sub string) {
+	cs.subscribed = append(cs.subscribed, sub)
 }
 
-func (cs *ConnStatus) Unsubscribe(ch string) {
-	cs.subscribed = slices.DeleteFunc(cs.subscribed, func(c string) bool { return c == ch })
+func (cs *ConnStatus) Unsubscribe(sub string) {
+	cs.subscribed = slices.DeleteFunc(cs.subscribed, func(c string) bool { return c == sub })
 }
 
 func (cs *ConnStatus) IsSub() bool {

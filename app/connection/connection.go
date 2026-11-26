@@ -1,6 +1,7 @@
 package connection
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -17,12 +18,20 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/rdb"
 	"github.com/codecrafters-io/redis-starter-go/app/repl"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
+	"github.com/codecrafters-io/redis-starter-go/app/sub"
 )
 
 var WRITE_COMMANDS = []string{"SET", "DEL", "INCR", "RPUSH", "LPUSH", "LPOP", "RPOP", "BLPOP", "BRPOP", "XADD", "EXEC", "MULTI"}
 var REPLICA_COMMANDS = []string{"INFO", "REPLCONF", "PSYNC"}
+var SUBSCRIBE_COMMANDS = []string{"SUBSCRIBE", "PUBLISH"}
 
-func clientLoop(rw *ConnRW, connStatus *cmd.ConnStatus, db *db.Database, rh *repl.Hub) {
+func clientLoop(
+	rw *ConnRW,
+	connStatus *cmd.ConnStatus,
+	db *db.Database,
+	rh *repl.Hub,
+	sh *sub.Hub,
+) {
 	var err error
 	var writting bool = false
 	var response resp.RESPValue
@@ -39,8 +48,8 @@ func clientLoop(rw *ConnRW, connStatus *cmd.ConnStatus, db *db.Database, rh *rep
 		}
 
 		response = nil
-		if connStatus.IsSub() {
-			response = cmd.GenerateSubResponse(command, connStatus)
+		if connStatus.IsSub() || slices.Contains(SUBSCRIBE_COMMANDS, strings.ToUpper(command.Name)) {
+			response = cmd.GenerateSubResponse(command, connStatus, sh)
 		} else {
 			response = cmd.GenerateResponse(command, db, connStatus, rh)
 		}
@@ -75,13 +84,30 @@ func clientLoop(rw *ConnRW, connStatus *cmd.ConnStatus, db *db.Database, rh *rep
 		// Master exit the client loop and replicate
 		if connStatus.ShouldRepeplicate() && !writting {
 			writting = true
-			go replicaWriter(rw, connStatus, rh)
+			go replicaWriter(rw, rh)
 		}
 
 	}
 }
 
-func replicaWriter(w *ConnRW, connStatus *cmd.ConnStatus, rh *repl.Hub) {
+func subWriter(ctx context.Context, w *ConnRW, connStatus *cmd.ConnStatus) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case data, ok := <-connStatus.Outbound():
+			if !ok {
+				return
+			}
+			if _, err := w.Write(data); err != nil {
+				log.Printf("faile to write to channel %v", err)
+				return
+			}
+		}
+	}
+}
+
+func replicaWriter(w *ConnRW, rh *repl.Hub) {
 	if _, err := w.Write(rdb.RDB{}.Serialize()); err != nil {
 		return
 	}
@@ -98,10 +124,20 @@ func replicaWriter(w *ConnRW, connStatus *cmd.ConnStatus, rh *repl.Hub) {
 	}
 }
 
-func handlClientConn(connection net.Conn, db *db.Database, connStatus *cmd.ConnStatus, rh *repl.Hub) {
+func handlClientConn(
+	connection net.Conn,
+	db *db.Database,
+	connStatus *cmd.ConnStatus,
+	rh *repl.Hub,
+	subHub *sub.Hub) {
 	defer connection.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	rw := NewConnRW(connection)
-	clientLoop(&rw, connStatus, db, rh)
+	go subWriter(ctx, &rw, connStatus)
+	clientLoop(&rw, connStatus, db, rh, subHub)
 
 }
 
@@ -112,6 +148,7 @@ func OpenClient(appConfig *config.Config, database *db.Database) error {
 		return err
 	}
 	replicaHub := repl.NewHub()
+	subHub := sub.NewHub()
 	for {
 		conn, err := l.Accept()
 		connStatus := cmd.NewConnStatus()
@@ -122,7 +159,7 @@ func OpenClient(appConfig *config.Config, database *db.Database) error {
 			log.Printf("accept %v", err)
 			continue
 		}
-		go handlClientConn(conn, database, &connStatus, &replicaHub)
+		go handlClientConn(conn, database, &connStatus, &replicaHub, &subHub)
 	}
 }
 
@@ -151,7 +188,8 @@ func OpenReplica(appConfig *config.Config, database *db.Database) error {
 	connStatus.MarkAsReplica()
 
 	replicaHub := repl.NewHub()
-	go clientLoop(&rw, &connStatus, database, &replicaHub)
+	subHub := sub.NewHub()
+	go clientLoop(&rw, &connStatus, database, &replicaHub, &subHub)
 	return nil
 }
 

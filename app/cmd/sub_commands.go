@@ -1,13 +1,44 @@
 package cmd
 
-import "errors"
+import (
+	"errors"
 
-func Subscribe(command Command, cs *ConnStatus) (int, string, error) {
+	"github.com/codecrafters-io/redis-starter-go/app/sub"
+)
+
+func Subscribe(command Command, cs *ConnStatus, sh *sub.Hub) (int, string, error) {
 	args := command.Args
 	if len(args) < 1 {
 		return 0, "", errors.New("failed to subscribe, not enough args")
 	}
-	ch := args[0]
-	cs.Subscribe(ch)
-	return cs.NumberOfSubscriptions(), ch, nil
+	sub := args[0]
+	cs.Subscribe(sub)
+	sh.AddChannel(sub, cs.Outbound())
+	return cs.NumberOfSubscriptions(), sub, nil
+}
+
+func Publish(command Command, cs *ConnStatus, sh *sub.Hub) (int, error) {
+	args := command.Args
+	if len(args) < 2 {
+		return 0, errors.New("failed to publish, not enough args")
+	}
+	sub := args[0]
+	msg := args[1]
+	err := sh.Publish([]byte(msg), sub)
+	if err != nil {
+		return 0, err
+	}
+	return sh.NumberOfSubscribers(sub), nil
+
+}
+
+func Unsusbscribe(command Command, cs *ConnStatus, sh *sub.Hub) (int, string, error) {
+	args := command.Args
+	if len(args) < 1 {
+		return 0, "", errors.New("failed to subscribe, not enough args")
+	}
+	sub := args[0]
+	cs.Unsubscribe(sub)
+	sh.RemoveChannel(sub, cs.Outbound())
+	return cs.NumberOfSubscriptions(), sub, nil
 }
