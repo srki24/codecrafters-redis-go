@@ -252,7 +252,7 @@ func (ss *SortedSet) AddElement(element SortedMember) {
 
 func (ss *SortedSet) Remove(key string) {
 	if idx := ss.Index(key); idx != -1 {
-		ss.items = append(ss.items[:idx], ss.items[idx:]...)
+		ss.items = append(ss.items[:idx], ss.items[idx+1:]...)
 	}
 }
 

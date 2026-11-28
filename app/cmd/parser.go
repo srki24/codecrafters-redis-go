@@ -361,6 +361,17 @@ func GenerateResponse(
 		} else {
 			response = resp.BulkString{Data: []byte(data)}
 		}
+	case "ZREM":
+		if data, err := Zrem(command, database); err != nil {
+			if errors.Is(err, ErrNotFound) {
+				response = resp.Integer{Data: 0}
+			} else {
+				response = resp.SimpleError{Data: err.Error()}
+			}
+		} else {
+			response = resp.Integer{Data: data}
+		}
+
 	}
 
 	if errResp, ok := response.(resp.SimpleError); ok {

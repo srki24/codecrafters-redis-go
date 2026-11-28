@@ -136,3 +136,39 @@ func Zcore(cmd Command, database *db.Database) (string, error) {
 		return strconv.FormatFloat(f, 'f', '4', 64), nil
 	}
 }
+
+func Zrem(cmd Command, database *db.Database) (int, error) {
+	args := cmd.Args
+	if len(args) < 2 {
+		return 0, errors.New("Err Failed to get zcard of a sorted set sorted set, not enough args")
+	}
+	dbKey := args[0]
+	ssKey := args[1]
+
+	fn := func(data db.Data, exists bool) (db.Data, int, error) {
+		var ss db.SortedSet
+		removed := 0
+		if !exists {
+			return data, 0, ErrNotFound
+		} else {
+			dbss, ok := data.Value.(db.SortedSet)
+			if !ok {
+				return data, 0, fmt.Errorf("expected sorted set for key %s, got %T", dbKey, data.Value)
+			}
+			ss = dbss
+
+		}
+		if idx := ss.Index(ssKey); idx == -1 {
+			removed = 0
+			return data, removed, ErrNotFound
+		}
+		ss.Remove(ssKey)
+		removed += 1
+		data.Value = ss
+		data.UpdatedTime = time.Now()
+		return data, removed, nil
+
+	}
+
+	return db.Update(database, dbKey, fn)
+}
