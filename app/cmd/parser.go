@@ -323,7 +323,11 @@ func GenerateResponse(
 		}
 	case "ZRANK":
 		if data, err := Zrank(command, database); err != nil {
-			response = resp.SimpleError{Data: err.Error()}
+			if errors.Is(err, ErrNotFound) {
+				response = resp.BulkString{Data: nil}
+			} else {
+				response = resp.SimpleError{Data: err.Error()}
+			}
 		} else {
 			response = resp.Integer{Data: data}
 		}

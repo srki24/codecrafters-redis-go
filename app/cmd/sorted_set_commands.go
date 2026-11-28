@@ -71,7 +71,12 @@ func Zrank(cmd Command, database *db.Database) (int, error) {
 	if ss, err := confirmZset(database, dbKey); err != nil {
 		return 0, err
 	} else {
-		return ss.Index(name), nil
+		if idx := ss.Index(name); idx == -1 {
+			return idx, ErrNotFound
+		} else {
+			return idx, nil
+		}
+
 	}
 
 }

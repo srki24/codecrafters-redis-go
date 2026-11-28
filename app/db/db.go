@@ -235,7 +235,7 @@ func (ss *SortedSet) Add(key string, value float64) {
 }
 
 func (ss *SortedSet) AddElement(element SortedMember) {
-	tolerance := 0.00001
+	tolerance := 0.0000000001
 
 	ss.items = append(ss.items, element)
 	sort.Slice(ss.items, func(i, j int) bool {
@@ -243,9 +243,9 @@ func (ss *SortedSet) AddElement(element SortedMember) {
 		e2 := ss.items[j]
 
 		if math.Abs(e1.Value-e2.Value) < tolerance { // same value, return lexigraphically
-			return e1.Key > e2.Key
+			return e1.Key < e2.Key
 		}
-		return e1.Value > e2.Value
+		return e1.Value < e2.Value
 	})
 }
 
