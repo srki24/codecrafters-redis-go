@@ -111,11 +111,8 @@ func Zcard(cmd Command, database *db.Database) (int, error) {
 	dbKey := args[0]
 
 	if ss, err := confirmZset(database, dbKey); err != nil {
-		if errors.Is(err, ErrNotFound) {
-			return 0, nil
-		} else {
-			return 0, err
-		}
+		return 0, err
+
 	} else {
 		return ss.NrElements(), nil
 	}
