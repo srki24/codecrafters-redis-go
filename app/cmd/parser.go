@@ -315,6 +315,36 @@ func GenerateResponse(
 		} else {
 			response = resp.NewArray(data)
 		}
+	case "ZADD":
+		if data, err := Zadd(command, database); err != nil {
+			response = resp.SimpleError{Data: err.Error()}
+		} else {
+			response = resp.Integer{Data: data}
+		}
+	case "ZRANK":
+		if data, err := Zrank(command, database); err != nil {
+			response = resp.SimpleError{Data: err.Error()}
+		} else {
+			response = resp.Integer{Data: data}
+		}
+	case "ZRANGE":
+		if data, err := Zrange(command, database); err != nil {
+			response = resp.SimpleError{Data: err.Error()}
+		} else {
+			response = resp.NewArray(data)
+		}
+	case "ZCARD":
+		if data, err := Zcard(command, database); err != nil {
+			response = resp.SimpleError{Data: err.Error()}
+		} else {
+			response = resp.Integer{Data: data}
+		}
+	case "ZSCORE":
+		if data, err := Zcore(command, database); err != nil {
+			response = resp.SimpleError{Data: err.Error()}
+		} else {
+			response = resp.BulkString{Data: []byte(data)}
+		}
 	}
 
 	if errResp, ok := response.(resp.SimpleError); ok {

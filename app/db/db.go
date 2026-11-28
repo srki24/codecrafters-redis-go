@@ -1,8 +1,11 @@
 package db
 
 import (
+	"errors"
 	"fmt"
+	"math"
 	"path"
+	"sort"
 	"sync"
 	"time"
 
@@ -201,4 +204,93 @@ type Stream struct {
 
 func (st Stream) GetType() string {
 	return "stream"
+}
+
+// sorted set
+
+type SortedMember struct {
+	Key   string
+	Value float64
+}
+
+type SortedSet struct {
+	items []SortedMember
+}
+
+func (ss *SortedSet) Index(key string) int {
+	for idx, e := range ss.items {
+		if e.Key == key {
+			return idx
+		}
+	}
+	return -1
+}
+
+func (ss *SortedSet) Add(key string, value float64) {
+	if idx := ss.Index(key); idx >= 0 {
+		ss.items[idx].Value = value
+	}
+	newMemeber := SortedMember{key, value}
+	ss.AddElement(newMemeber)
+}
+
+func (ss *SortedSet) AddElement(element SortedMember) {
+	tolerance := 0.00001
+
+	ss.items = append(ss.items, element)
+	sort.Slice(ss.items, func(i, j int) bool {
+		e1 := ss.items[i]
+		e2 := ss.items[j]
+
+		if math.Abs(e1.Value-e2.Value) < tolerance { // same value, return lexigraphically
+			return e1.Key > e2.Key
+		}
+		return e1.Value > e2.Value
+	})
+}
+
+func (ss *SortedSet) Remove(key string) {
+	if idx := ss.Index(key); idx != -1 {
+		ss.items = append(ss.items[:idx], ss.items[idx:]...)
+	}
+}
+
+func (ss *SortedSet) Score(key string) (float64, bool) {
+	if idx := ss.Index(key); idx != -1 {
+		return ss.items[idx].Value, true
+	}
+	return 0, false
+}
+
+func (ss *SortedSet) Range(fromIdx, toIdx int) ([]string, error) {
+	nrElements := len(ss.items)
+
+	if fromIdx > nrElements {
+		return nil, errors.New("index out of range")
+	}
+	if fromIdx < 0 {
+		fromIdx = max(0, nrElements+fromIdx)
+	}
+	if toIdx < 0 {
+		toIdx = max(0, nrElements+toIdx+1)
+	} else {
+		toIdx = min(toIdx+1, nrElements)
+	}
+	if toIdx < fromIdx {
+		return nil, errors.New("to index must be greater then from index")
+	}
+	var out []string
+	for _, e := range ss.items[fromIdx:toIdx] {
+		out = append(out, e.Key)
+	}
+	return out, nil
+
+}
+
+func (ss SortedSet) NrElements() int {
+	return len(ss.items)
+}
+
+func (ss SortedSet) GetType() string {
+	return "sortedset"
 }
