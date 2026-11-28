@@ -229,6 +229,7 @@ func (ss *SortedSet) Index(key string) int {
 func (ss *SortedSet) Add(key string, value float64) {
 	if idx := ss.Index(key); idx >= 0 {
 		ss.items[idx].Value = value
+		return
 	}
 	newMemeber := SortedMember{key, value}
 	ss.AddElement(newMemeber)

@@ -344,7 +344,7 @@ func GenerateResponse(
 	case "ZCARD":
 		if data, err := Zcard(command, database); err != nil {
 			if errors.Is(err, ErrNotFound) {
-				response = resp.BulkString{Data: nil}
+				response = resp.Integer{0}
 			} else {
 				response = resp.SimpleError{Data: err.Error()}
 			}
