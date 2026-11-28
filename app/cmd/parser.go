@@ -333,7 +333,11 @@ func GenerateResponse(
 		}
 	case "ZRANGE":
 		if data, err := Zrange(command, database); err != nil {
-			response = resp.SimpleError{Data: err.Error()}
+			if errors.Is(err, ErrNotFound) {
+				response = resp.Array{Data: nil}
+			} else {
+				response = resp.SimpleError{Data: err.Error()}
+			}
 		} else {
 			response = resp.NewArray(data)
 		}
