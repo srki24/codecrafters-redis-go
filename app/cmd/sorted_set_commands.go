@@ -27,7 +27,6 @@ func Zadd(cmd Command, database *db.Database) (int, error) {
 		var inserted int = 0
 		if !exists {
 			ss = db.SortedSet{} // new
-			inserted = 1
 		} else {
 			dbss, ok := data.Value.(db.SortedSet)
 			if !ok {
@@ -35,6 +34,9 @@ func Zadd(cmd Command, database *db.Database) (int, error) {
 			}
 			ss = dbss
 
+		}
+		if idx := ss.Index(key); idx == -1 { //new key added
+			inserted = 1
 		}
 		ss.Add(key, value)
 		data.Value = ss
